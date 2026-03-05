@@ -27,6 +27,14 @@
 - [x] 更新 README 为 OpenAI 兼容接口说明
 - [x] 更新 lessons，记录本次纠正规则
 
+## 2026-03-05 .env 配置改造
+
+- [x] 引入 `.env` 自动加载机制（项目根目录）
+- [x] 增加 `.env.example` 模板并忽略真实 `.env`
+- [x] 更新 README，改为 `.env` 配置示例
+- [x] 更新 lessons，记录本次纠正规则
+- [x] 更新 todo review，记录改造结论
+
 # Review
 
 - 目录结构已按要求创建。
@@ -41,3 +49,6 @@
 - `README.md` 和 `requirements.txt` 已更新。
 - 未运行 Python 级验证（遵循仓库约定，需你本地执行验证命令）。
 - 兼容第三方平台口径：支持 `API_KEY/API_BASE`、`--api-base`，并放宽 provider 约束。
+- 已支持启动时自动读取项目根目录 `.env`（`config.py`）。
+- 新增 `.env.example` 模板与 `.gitignore`（忽略真实 `.env`）。
+- 新增 `.env` 占位文件，直接替换 key/base/model 即可运行。

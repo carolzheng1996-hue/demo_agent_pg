@@ -9,3 +9,8 @@
 - 触发: 用户纠正“不是官方 OpenAI key，而是第三方平台购买的 key/base”。
 - 规则: 设计 LLM 配置时默认按 OpenAI 兼容协议处理，优先支持 `api_key + api_base`，不要把能力绑死在 provider 名称上。
 - 规则: 参数和文档要覆盖用户常见口径（如 `API_BASE`、`--api-base`），避免只有内部命名（如 `base_url`）。
+
+- 日期: 2026-03-05
+- 触发: 用户要求改为 `.env` 方式配置 API 信息。
+- 规则: 当涉及 key/base/model 配置时，默认提供 `.env` 自动加载能力，并配套 `.env.example` 与 `.gitignore`。
+- 规则: 文档中优先展示 `.env` 用法，同时保留 CLI 参数覆盖路径。

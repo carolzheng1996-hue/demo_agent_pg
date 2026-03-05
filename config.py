@@ -5,6 +5,14 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 BASE_DIR = Path(__file__).resolve().parent
+try:
+    from dotenv import load_dotenv
+except Exception:  # pragma: no cover - keep runtime tolerant if dependency is missing
+    load_dotenv = None
+
+if load_dotenv is not None:
+    load_dotenv(dotenv_path=BASE_DIR / ".env", override=False)
+
 DATA_DIR = BASE_DIR / "data"
 OUTPUT_DIR = BASE_DIR / "output"
 TASKS_DIR = BASE_DIR / ".tasks"

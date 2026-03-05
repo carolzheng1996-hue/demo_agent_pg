@@ -33,13 +33,15 @@
 
 ## Usage
 
-可选：先配置 OpenAI 兼容接口（推荐）
+推荐：在项目根目录使用 `.env` 配置 OpenAI 兼容接口
 
 ```bash
-export API_KEY="你的平台key"              # 或 OPENAI_API_KEY / AGENT_API_KEY
-export API_BASE="你的平台base_url"       # 或 OPENAI_BASE_URL / AGENT_API_BASE_URL
-export AGENT_MODEL="你的平台模型名"       # 例如 deepseek-chat / qwen-max / gpt-4o-mini
+API_KEY=你的平台key
+API_BASE=你的平台base_url
+AGENT_MODEL=你的平台模型名
 ```
+
+已内置自动加载：程序启动时会读取项目根目录 `.env`。
 
 统计分析任务：
 
@@ -73,4 +75,5 @@ python main.py \
 说明：
 
 - 配置 `api_key` 后：`orchestrator` 意图识别、`model_selection`、`summary` 会优先走大模型（OpenAI 兼容接口）。
+- `.env` 与 CLI 参数同时存在时：CLI 参数优先。
 - 未配置 Key 时：自动回退到本地规则，不影响主流程运行。
