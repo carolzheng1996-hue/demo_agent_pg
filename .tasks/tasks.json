@@ -1,0 +1,23 @@
+[
+  {
+    "name": "data_reading",
+    "status": "done",
+    "detail": "loaded ETTh1.csv, rows=17420, target=OT",
+    "started_at": "2026-03-05T16:28:52",
+    "finished_at": "2026-03-05T16:28:52"
+  },
+  {
+    "name": "data_analysis",
+    "status": "done",
+    "detail": "analysis completed",
+    "started_at": "2026-03-05T16:28:52",
+    "finished_at": "2026-03-05T16:28:53"
+  },
+  {
+    "name": "summary",
+    "status": "done",
+    "detail": "summary generated",
+    "started_at": "2026-03-05T16:28:53",
+    "finished_at": "2026-03-05T16:28:57"
+  }
+]
