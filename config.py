@@ -19,6 +19,14 @@ TASKS_DIR = BASE_DIR / ".tasks"
 STATE_FILE = TASKS_DIR / "global_state.json"
 TASKS_FILE = TASKS_DIR / "tasks.json"
 
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def build_api_config(overrides: Optional[Dict[str, Optional[str]]] = None) -> Dict[str, Optional[str]]:
     base_url = (
         os.getenv("AGENT_API_BASE_URL")
@@ -36,6 +44,9 @@ def build_api_config(overrides: Optional[Dict[str, Optional[str]]] = None) -> Di
         "base_url": base_url,
         "api_key": api_key,
         "model": os.getenv("AGENT_MODEL", "gpt-4o-mini"),
+        # Default to not trusting env proxy to avoid hidden localhost proxy failures.
+        "trust_env_proxy": "true" if _env_bool("AGENT_TRUST_ENV_PROXY", False) else "false",
+        "timeout_seconds": os.getenv("AGENT_TIMEOUT_SECONDS", "60"),
     }
     if overrides:
         for k, v in overrides.items():

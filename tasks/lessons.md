@@ -14,3 +14,8 @@
 - 触发: 用户要求改为 `.env` 方式配置 API 信息。
 - 规则: 当涉及 key/base/model 配置时，默认提供 `.env` 自动加载能力，并配套 `.env.example` 与 `.gitignore`。
 - 规则: 文档中优先展示 `.env` 用法，同时保留 CLI 参数覆盖路径。
+
+- 日期: 2026-03-05
+- 触发: 用户反馈 key/base 已配置但 `llm_test.py` 仍请求失败。
+- 规则: 第三方 OpenAI 兼容平台调试时，优先排查系统代理变量（`http_proxy/https_proxy`）对 SDK 的影响，并提供可配置的 `trust_env_proxy` 开关。
+- 规则: 测试脚本需输出结构化诊断（模型探测、状态码、响应体片段），避免仅返回笼统错误。

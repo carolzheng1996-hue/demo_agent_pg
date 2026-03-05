@@ -35,6 +35,22 @@
 - [x] 更新 lessons，记录本次纠正规则
 - [x] 更新 todo review，记录改造结论
 
+## 2026-03-05 第三方 API 适配与调试增强
+
+- [x] 定位当前 `.env` 接入失败根因并给出结论
+- [x] 在 LLM 客户端增加代理与参数兼容配置（适配 OpenAI 兼容平台）
+- [x] 增强 `llm_test.py` 的错误诊断与模型探测输出
+- [x] 更新 `.env.example` 与 README 调试说明
+- [x] 更新 todo review，记录本次调试结论
+
+## 2026-03-05 报告结果细节增强
+
+- [x] 在评估层补充全模型与 ensemble 选择细节字段
+- [x] 在 summary 报告中展示全部模型结果（逐模型指标）
+- [x] 在 summary 报告中展示 ensemble 两个成员及各自指标/权重
+- [x] 在 summary 报告中展示 ensemble 指标与相对最佳单模型差值
+- [x] 运行命令验证报告内容并更新 review
+
 # Review
 
 - 目录结构已按要求创建。
@@ -52,3 +68,8 @@
 - 已支持启动时自动读取项目根目录 `.env`（`config.py`）。
 - 新增 `.env.example` 模板与 `.gitignore`（忽略真实 `.env`）。
 - 新增 `.env` 占位文件，直接替换 key/base/model 即可运行。
+- 已定位 `llm_test.py` 失败根因：环境代理 `http_proxy/https_proxy` 指向 `127.0.0.1:17890`，导致 SDK 连接失败。
+- `LLMClient` 增加 `AGENT_TRUST_ENV_PROXY` 与 `AGENT_TIMEOUT_SECONDS` 配置，并加入 chat 参数兼容回退。
+- `llm_test.py` 增加 `/models` 探测、错误分层输出（含 status code/response body 片段）和参数兼容重试。
+- 报告增强：已输出全模型逐项指标、ensemble 两成员选择与权重、以及 ensemble 相对最佳单模型的指标差值。
+- 验证通过：建模任务报告已包含上述明细；统计任务报告不再混入历史模型结果。

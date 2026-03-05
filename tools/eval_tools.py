@@ -22,9 +22,11 @@ def compare_models(model_results: List[Dict[str, Any]]) -> Dict[str, Any]:
         "ranking": [
             {
                 "name": x.get("name"),
+                "backend": x.get("backend"),
                 "mae": x.get("metrics", {}).get("mae"),
                 "rmse": x.get("metrics", {}).get("rmse"),
                 "mape": x.get("metrics", {}).get("mape"),
+                "params": x.get("params", {}),
             }
             for x in ranked
         ],
@@ -40,11 +42,35 @@ def create_ensemble(
     ranked = sorted(model_results, key=lambda x: x.get("metrics", {}).get("mae", float("inf")))
     members = ranked[: max(1, top_k)]
     preds = np.mean([np.asarray(m["predictions"], dtype=np.float64) for m in members], axis=0)
+    weight = 1.0 / float(len(members))
+    member_details = [
+        {
+            "name": m.get("name"),
+            "backend": m.get("backend"),
+            "metrics": m.get("metrics", {}),
+            "params": m.get("params", {}),
+            "weight": weight,
+        }
+        for m in members
+    ]
 
     output: Dict[str, Any] = {
+        "strategy": "simple_average",
+        "selection_rule": "top_k_by_lowest_mae",
+        "top_k_requested": int(top_k),
+        "top_k_used": int(len(members)),
         "member_models": [m["name"] for m in members],
+        "member_details": member_details,
         "predictions": preds.tolist(),
     }
     if actual is not None:
-        output["metrics"] = compute_metrics(np.asarray(actual, dtype=np.float64), preds)
+        ens_metrics = compute_metrics(np.asarray(actual, dtype=np.float64), preds)
+        output["metrics"] = ens_metrics
+        best_metrics = members[0].get("metrics", {}) if members else {}
+        if best_metrics:
+            output["delta_vs_best_single"] = {
+                "mae": float(ens_metrics.get("mae", 0.0) - float(best_metrics.get("mae", 0.0))),
+                "rmse": float(ens_metrics.get("rmse", 0.0) - float(best_metrics.get("rmse", 0.0))),
+                "mape": float(ens_metrics.get("mape", 0.0) - float(best_metrics.get("mape", 0.0))),
+            }
     return output

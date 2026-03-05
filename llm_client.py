@@ -34,6 +34,8 @@ class LLMClient:
         self.base_url = cfg.get("base_url")
         self.api_key = cfg.get("api_key")
         self.model = cfg.get("model") or "gpt-4o-mini"
+        self.trust_env_proxy = str(cfg.get("trust_env_proxy") or "false").lower() in {"1", "true", "yes", "on"}
+        self.timeout_seconds = float(cfg.get("timeout_seconds") or 60.0)
         self._client = None
 
     @property
@@ -54,8 +56,55 @@ class LLMClient:
         kwargs: Dict[str, Any] = {"api_key": self.api_key}
         if self.base_url:
             kwargs["base_url"] = self.base_url
+        try:
+            import httpx
+
+            kwargs["http_client"] = httpx.Client(trust_env=self.trust_env_proxy, timeout=self.timeout_seconds)
+        except Exception:
+            pass
         self._client = OpenAI(**kwargs)
         return self._client
+
+    def _chat_create(
+        self,
+        messages: list[dict[str, str]],
+        max_tokens: int,
+        temperature: float,
+        response_format: Optional[Dict[str, str]] = None,
+    ):
+        client = self._get_client()
+        if client is None:
+            return None
+
+        req: Dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        if response_format is not None:
+            req["response_format"] = response_format
+
+        attempts: list[Dict[str, Any]] = [dict(req)]
+
+        # Some OpenAI-compatible gateways prefer max_completion_tokens.
+        req_alt = dict(req)
+        req_alt.pop("max_tokens", None)
+        req_alt["max_completion_tokens"] = max_tokens
+        attempts.append(req_alt)
+
+        # Some gateways reject response_format or temperature; keep a minimal fallback.
+        req_min = dict(req_alt)
+        req_min.pop("response_format", None)
+        req_min.pop("temperature", None)
+        attempts.append(req_min)
+
+        for payload in attempts:
+            try:
+                return client.chat.completions.create(**payload)
+            except Exception:
+                continue
+        return None
 
     def complete_text(
         self,
@@ -64,25 +113,20 @@ class LLMClient:
         max_tokens: int = 400,
         temperature: float = 0.0,
     ) -> Optional[str]:
-        client = self._get_client()
-        if client is None:
+        resp = self._chat_create(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        if resp is None:
             return None
-        try:
-            resp = client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
-            content = resp.choices[0].message.content if resp.choices else None
-            if isinstance(content, str):
-                text = content.strip()
-                return text or None
-        except Exception:
-            return None
+        content = resp.choices[0].message.content if resp.choices else None
+        if isinstance(content, str):
+            text = content.strip()
+            return text or None
         return None
 
     def complete_json(
@@ -92,29 +136,22 @@ class LLMClient:
         max_tokens: int = 300,
         temperature: float = 0.0,
     ) -> Optional[Dict[str, Any]]:
-        client = self._get_client()
-        if client is None:
-            return None
-
         # First try strict JSON mode; fallback to text + parse for broader compatibility.
-        try:
-            resp = client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                max_tokens=max_tokens,
-                temperature=temperature,
-                response_format={"type": "json_object"},
-            )
+        resp = self._chat_create(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            max_tokens=max_tokens,
+            temperature=temperature,
+            response_format={"type": "json_object"},
+        )
+        if resp is not None:
             content = resp.choices[0].message.content if resp.choices else None
             if isinstance(content, str):
                 parsed = _parse_json_text(content)
                 if parsed is not None:
                     return parsed
-        except Exception:
-            pass
 
         plain = self.complete_text(
             system_prompt=system_prompt + "\nAlways respond with a single JSON object.",

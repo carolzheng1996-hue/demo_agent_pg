@@ -39,6 +39,7 @@
 API_KEY=你的平台key
 API_BASE=你的平台base_url
 AGENT_MODEL=你的平台模型名
+AGENT_TRUST_ENV_PROXY=false
 ```
 
 已内置自动加载：程序启动时会读取项目根目录 `.env`。
@@ -77,3 +78,12 @@ python main.py \
 - 配置 `api_key` 后：`orchestrator` 意图识别、`model_selection`、`summary` 会优先走大模型（OpenAI 兼容接口）。
 - `.env` 与 CLI 参数同时存在时：CLI 参数优先。
 - 未配置 Key 时：自动回退到本地规则，不影响主流程运行。
+
+API 调试：
+
+```bash
+python llm_test.py
+```
+
+- `llm_test.py` 会先探测 `/models`，再做最小 chat 请求，并打印更详细的失败原因。
+- 若报错里出现 `127.0.0.1` 或本地代理地址，通常是环境代理导致；请保持 `.env` 中 `AGENT_TRUST_ENV_PROXY=false`。
