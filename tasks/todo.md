@@ -142,3 +142,40 @@
 - 根目录 `README.md` 已改为 `.env` 自动扫描和 `get_llm().invoke(...)` 的统一说明。
 - `llm_client.py` 目前仍保留在仓库中，但已不再被主流程或 `5_DGagent` 主流程引用。
 - 未执行 Python 级验证（遵循仓库约定，需你本地执行验证命令）。
+
+## 2026-03-09 仓库功能与 LoongFlow 对比文档
+
+- [x] 审查当前仓库结构与现有 README
+- [x] 整理根目录主流程与 `5_DGagent` 的功能说明
+- [x] 整理 LoongFlow `ml_agent` 架构、主智能体判断与调用链
+- [x] 输出独立 Markdown 文档
+- [x] 更新 todo review
+
+- 已新增 `REPO_FUNCTION_AND_LOONGFLOW_COMPARISON.md`，说明本仓库功能、根目录与 `5_DGagent` 的调用链、LoongFlow `ml_agent` 是否存在主智能体，以及 `5_DGagent` 可借鉴的演进方向。
+- 已新增 `REPO_FUNCTION_AND_LOONGFLOW_COMPARISON_BRIEF.md`，作为适合答辩/PPT 口径的精简版说明文档。
+
+## 2026-03-09 5_DGagent LoongFlow 风格优化
+
+- [ ] 细化 `5_DGagent` 建模前后阶段，新增 `feature_engineering`、`split_strategy`、`preprocess`、`evaluator`
+- [ ] 重构 `DGOrchestrator`，支持建模任务的 iteration 闭环与最多 10 轮自动优化
+- [ ] 在保留 `data_reading` 人工审批前提下，将自动优化限制在审批后的建模阶段
+- [ ] 增加明确的工件输出结构：`output/<task-id>/<iteration-id>/<step>/...`
+- [ ] 更新 `summary` 逻辑，支持每轮总结与最终总结
+- [ ] 更新 `README.md` 与 review，说明 LoongFlow 风格优化后的调用机制
+
+## 2026-03-09 loongflow_DGagent 新目录实现
+
+- [x] 撤回本轮误写入 `5_DGagent` 的 LoongFlow 风格改动
+- [x] 创建新的 `loongflow_DGagent` 目录并复制基础骨架
+- [x] 新增 `feature_engineering`、`split_strategy`、`preprocess`、`evaluator` 子智能体
+- [x] 引入 evaluator 驱动的 iteration 闭环，支持最多 10 轮自动优化
+- [x] 保留 `data_reading` 人工审批，并将自动优化限制在审批后阶段
+- [x] 实现 `output/<task-id>/<iteration-id>/<step>/...` 工件输出结构
+- [x] 新增 `run_loongflow_dgagent.py` 与 `loongflow_DGagent/README.md`
+- [x] 更新 lessons，记录“新目录实现”纠正规则
+- [x] 更新 todo review，记录本次新增目录与未执行验证项
+
+- 已新增 `loongflow_DGagent/`，在不覆盖 `5_DGagent` 的前提下引入 LoongFlow 风格的 stage 拆分、iteration 闭环和工件目录结构。
+- `loongflow_DGagent/orchestrator.py` 已支持审批后的多轮建模优化，默认 3 轮，最大不超过 10 轮。
+- `loongflow_DGagent/output/<task-id>/<iteration-id>/` 下会输出 `plan.json`、各阶段结果和 `summary.md`，任务根目录会输出 `final_summary.md` 与 `iteration_history.json`。
+- 未执行 Python 级验证（遵循仓库约定，需你本地执行验证命令）。
