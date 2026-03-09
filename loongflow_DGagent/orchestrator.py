@@ -29,6 +29,62 @@ class DGOrchestrator:
         self.task_manager = task_manager
 
     @staticmethod
+    def _analyze_intent_fallback(user_query: str) -> str:
+        query = user_query.strip()
+        q = query.lower()
+        analysis_kw = ["统计", "特性分析", "分析", "statistics", "analysis"]
+        forecast_kw = ["预测", "建模", "训练", "模型", "forecast", "train", "model"]
+        context_kw = ["时序", "时间序列", "time series", "dataset", "数据集", "csv", "etth", "ettm", "数据"]
+
+        has_analysis = any(k in q for k in analysis_kw)
+        has_forecast = any(k in q for k in forecast_kw)
+        has_context = any(k in q for k in context_kw)
+
+        if has_forecast:
+            return "build_forecast_model"
+        if has_analysis or has_context:
+            return "analysis_only"
+        return "general_chat"
+
+    @staticmethod
+    def _fallback_plan(intent: str) -> Tuple[List[str], Dict]:
+        if intent == "build_forecast_model":
+            plan = [
+                "data_reading",
+                "data_analysis",
+                "feature_engineering",
+                "split_strategy",
+                "preprocess",
+                "model_selection",
+                "model_training",
+                "model_integration",
+                "evaluator",
+                "summary",
+            ]
+            meta = {
+                "task_type": "forecast_modeling",
+                "requires_modeling": True,
+                "requires_split": True,
+            }
+        elif intent == "analysis_only":
+            plan = ["data_reading", "data_analysis", "feature_engineering", "summary"]
+            meta = {
+                "task_type": "analysis_only",
+                "requires_modeling": False,
+                "requires_split": False,
+            }
+        else:
+            plan = ["summary"]
+            meta = {
+                "task_type": "general_chat",
+                "requires_modeling": False,
+                "requires_split": False,
+            }
+        meta["teams"] = DGOrchestrator._map_teams(plan)
+        meta["plan_source"] = "fallback"
+        return plan, meta
+
+    @staticmethod
     def _canonical_plan(raw_plan: List[str]) -> List[str]:
         canonical = [
             "data_reading",
@@ -73,6 +129,7 @@ class DGOrchestrator:
         return selected
 
     def _generate_plan(self, user_query: str) -> Tuple[List[str], Dict]:
+        fallback_intent = self._analyze_intent_fallback(user_query)
         payload = invoke_json(
             system_prompt=(
                 "You are the main agent of a data analysis system. Understand the user task semantically and produce an execution plan. "
@@ -93,19 +150,16 @@ class DGOrchestrator:
         )
 
         if not payload:
-            plan = ["data_reading", "data_analysis", "feature_engineering", "summary"]
-            metadata = {
-                "task_type": "analysis_only",
-                "requires_modeling": False,
-                "requires_split": False,
-                "teams": self._map_teams(plan),
-                "reason": "llm_unavailable_default_to_analysis_only",
-                "plan_source": "fallback",
-            }
+            plan, metadata = self._fallback_plan(fallback_intent)
+            metadata["reason"] = f"llm_unavailable_{fallback_intent}"
             return plan, metadata
 
         plan = self._canonical_plan(payload.get("subagents", []))
         requires_modeling = bool(payload.get("requires_modeling", False))
+        if not plan:
+            plan, metadata = self._fallback_plan(fallback_intent)
+            metadata["reason"] = f"llm_empty_plan_{fallback_intent}"
+            return plan, metadata
         metadata = {
             "task_type": payload.get("task_type", "unknown"),
             "requires_modeling": requires_modeling,
