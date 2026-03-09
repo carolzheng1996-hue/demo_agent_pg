@@ -5,7 +5,7 @@ from typing import Dict, List
 
 from config import MODEL_CONFIG
 from global_state import GlobalState
-from llm_client import LLMClient
+from llm_utils import invoke_json
 
 
 def _fallback_model_names(rows: int) -> List[str]:
@@ -17,12 +17,11 @@ def _fallback_model_names(rows: int) -> List[str]:
 
 def run(state: GlobalState) -> Dict:
     rows = int(state.read("data_shape", [0, 0])[0])
-    llm = LLMClient(state.read("api_config", {}))
     selected_names = _fallback_model_names(rows)
     selection_reason = "fallback_rules"
 
     analysis = state.read("analysis", {})
-    payload = llm.complete_json(
+    payload = invoke_json(
         system_prompt=(
             "Pick model candidates for time-series forecast from fixed names: arima, xgboost, lstm. "
             "Return JSON with keys: models (array), reason (string). "

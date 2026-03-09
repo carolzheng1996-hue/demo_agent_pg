@@ -1,3 +1,11 @@
 .env
 __pycache__/
 *.pyc
+.env.old
+.tasks/
+output/
+5_DGagent/.state/
+5_DGagent/LLM/.env
+5_DGagent/__pycache__/
+5_DGagent/subagents/__pycache__/
+5_DGagent/tools/__pycache__/

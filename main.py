@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from config import build_api_config, ensure_directories
+from config import ensure_directories
 from global_state import GlobalState
 from orchestrator import Orchestrator
 from task_manager import TaskManager
@@ -15,26 +15,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dataset-name", default="etth", help="数据集名")
     parser.add_argument("--dataset-path", default=None, help="CSV 路径，例如 data/ETTh1.csv")
     parser.add_argument("--print-state", action="store_true", help="打印完整 global state")
-    parser.add_argument("--api-provider", default=None, help="LLM provider，默认 openai")
-    parser.add_argument("--api-key", default=None, help="LLM API Key（可替代环境变量）")
-    parser.add_argument("--api-base-url", "--api-base", dest="api_base_url", default=None, help="LLM API Base URL（可选）")
-    parser.add_argument("--api-model", default=None, help="LLM 模型名，例如 gpt-4o-mini")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     ensure_directories()
-
-    api_config = build_api_config(
-        {
-            "provider": args.api_provider,
-            "api_key": args.api_key,
-            "base_url": args.api_base_url,
-            "model": args.api_model,
-        }
-    )
-    state = GlobalState(initial={"api_config": api_config})
+    state = GlobalState()
     task_manager = TaskManager()
     orchestrator = Orchestrator(state=state, task_manager=task_manager)
 

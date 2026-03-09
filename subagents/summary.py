@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 
 from config import OUTPUT_DIR
 from global_state import GlobalState
-from llm_client import LLMClient
+from llm_utils import invoke_text
 
 
 def _fmt_metric(value: Any) -> str:
@@ -101,8 +101,7 @@ def run(state: GlobalState) -> Dict:
     integration = state.read("integration", {})
     structured_text = _build_structured_summary(query, dataset, dataset_path, plan, analysis, integration)
 
-    llm = LLMClient(state.read("api_config", {}))
-    llm_summary = llm.complete_text(
+    llm_summary = invoke_text(
         system_prompt=(
             "You are a senior time-series engineer. "
             "Write a concise Chinese executive summary in <= 6 lines. "
@@ -120,8 +119,6 @@ def run(state: GlobalState) -> Dict:
             },
             ensure_ascii=False,
         ),
-        max_tokens=220,
-        temperature=0.2,
     )
     summary_text = structured_text
     if llm_summary:

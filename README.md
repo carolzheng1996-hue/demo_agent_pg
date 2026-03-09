@@ -7,7 +7,7 @@
 - `global_state.py`: GlobalState 共享状态总线
 - `agent_loop.py`: `agent_loop` + `run_subagent`
 - `task_manager.py`: 任务追踪（JSON 持久化）
-- `orchestrator.py`: 主编排器（意图识别 + 调度）
+- `orchestrator.py`: 主编排器（LLM 主智能体生成 plan + 调度）
 - `subagents/`: 6 个专业子 Agent
 - `tools/`: 19 个工具函数
 - `data/`: 数据目录
@@ -33,16 +33,17 @@
 
 ## Usage
 
-推荐：在项目根目录使用 `.env` 配置 OpenAI 兼容接口
+推荐：使用 `5_DGagent/LLM` 提供的统一 LLM 接入方式。系统会自动扫描 `5_DGagent/LLM/.env`、`5_DGagent/.env` 和项目根目录 `.env`。
 
 ```bash
 API_KEY=你的平台key
 API_BASE=你的平台base_url
 AGENT_MODEL=你的平台模型名
-AGENT_TRUST_ENV_PROXY=false
 ```
 
-已内置自动加载：程序启动时会读取项目根目录 `.env`。
+已内置自动加载，无需再通过 CLI 传 `--api-key/--api-base/--api-model`。
+
+如果 `.env` 中使用的是 `OUT_OPENAI_API_KEY/OUT_OPENAI_API_BASE`，当前项目会自动切到 `get_llm(..., is_outside=True)`。
 
 统计分析任务：
 
@@ -62,21 +63,15 @@ python main.py --query "针对etth数据集构建时序预测模型" --dataset-p
 python main.py --query "针对etth数据集构建时序预测模型" --dataset-path data/ETTh1.csv --print-state
 ```
 
-不设环境变量，直接命令行传 key + base：
+闲聊或非时序请求（例如 `--query "你好"`）：
 
-```bash
-python main.py \
-  --query "针对etth数据集构建时序预测模型" \
-  --dataset-path data/ETTh1.csv \
-  --api-key "你的平台key" \
-  --api-base "你的平台base_url" \
-  --api-model "你的平台模型名"
-```
+- 主编排器会识别为 `general_chat`，仅执行 `summary`。
+- 不会触发 `model_selection/model_training/result_integration`。
 
 说明：
 
-- 配置 `api_key` 后：`orchestrator` 意图识别、`model_selection`、`summary` 会优先走大模型（OpenAI 兼容接口）。
-- `.env` 与 CLI 参数同时存在时：CLI 参数优先。
+- LLM 调用已统一复用 `5_DGagent/LLM/llm.py`，通过 `get_llm().invoke(...)` 执行。
+- 根目录主流程和 `5_DGagent` 现已共用同一套 `.env` 扫描和代理配置逻辑。
 - 未配置 Key 时：自动回退到本地规则，不影响主流程运行。
 
 API 调试：
@@ -85,5 +80,4 @@ API 调试：
 python llm_test.py
 ```
 
-- `llm_test.py` 会先探测 `/models`，再做最小 chat 请求，并打印更详细的失败原因。
-- 若报错里出现 `127.0.0.1` 或本地代理地址，通常是环境代理导致；请保持 `.env` 中 `AGENT_TRUST_ENV_PROXY=false`。
+- `llm_test.py` 会直接通过 `get_llm().invoke(...)` 测试当前项目实际使用的 LLM 启动方式。
