@@ -3,21 +3,42 @@
     "name": "data_reading",
     "status": "done",
     "detail": "loaded ETTh1.csv, rows=17420, target=OT",
-    "started_at": "2026-03-05T16:28:52",
-    "finished_at": "2026-03-05T16:28:52"
+    "started_at": "2026-03-06T17:10:12",
+    "finished_at": "2026-03-06T17:10:12"
   },
   {
     "name": "data_analysis",
     "status": "done",
     "detail": "analysis completed",
-    "started_at": "2026-03-05T16:28:52",
-    "finished_at": "2026-03-05T16:28:53"
+    "started_at": "2026-03-06T17:10:12",
+    "finished_at": "2026-03-06T17:10:13"
+  },
+  {
+    "name": "model_selection",
+    "status": "done",
+    "detail": "selected 3 model candidates (fallback_rules)",
+    "started_at": "2026-03-06T17:10:13",
+    "finished_at": "2026-03-06T17:10:22"
+  },
+  {
+    "name": "model_training",
+    "status": "done",
+    "detail": "trained 3 models",
+    "started_at": "2026-03-06T17:10:22",
+    "finished_at": "2026-03-06T17:10:25"
+  },
+  {
+    "name": "result_integration",
+    "status": "done",
+    "detail": "integration completed",
+    "started_at": "2026-03-06T17:10:25",
+    "finished_at": "2026-03-06T17:10:25"
   },
   {
     "name": "summary",
     "status": "done",
     "detail": "summary generated",
-    "started_at": "2026-03-05T16:28:53",
-    "finished_at": "2026-03-05T16:28:57"
+    "started_at": "2026-03-06T17:10:25",
+    "finished_at": "2026-03-06T17:10:29"
   }
 ]

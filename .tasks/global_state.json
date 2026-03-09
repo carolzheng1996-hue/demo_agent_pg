@@ -7,13 +7,16 @@
     "trust_env_proxy": "false",
     "timeout_seconds": "60"
   },
-  "user_query": "针对etth数据集进行统计特性分析",
+  "user_query": "你好",
   "dataset_name": "etth",
   "dataset_path": "data/ETTh1.csv",
-  "intent": "stats_analysis",
+  "intent": "build_forecast_model",
   "plan": [
     "data_reading",
     "data_analysis",
+    "model_selection",
+    "model_training",
+    "result_integration",
     "summary"
   ],
   "llm_enabled": true,
@@ -22,22 +25,43 @@
       "name": "data_reading",
       "status": "done",
       "detail": "loaded ETTh1.csv, rows=17420, target=OT",
-      "started_at": "2026-03-05T16:28:52",
-      "finished_at": "2026-03-05T16:28:52"
+      "started_at": "2026-03-06T17:10:12",
+      "finished_at": "2026-03-06T17:10:12"
     },
     {
       "name": "data_analysis",
       "status": "done",
       "detail": "analysis completed",
-      "started_at": "2026-03-05T16:28:52",
-      "finished_at": "2026-03-05T16:28:53"
+      "started_at": "2026-03-06T17:10:12",
+      "finished_at": "2026-03-06T17:10:13"
+    },
+    {
+      "name": "model_selection",
+      "status": "done",
+      "detail": "selected 3 model candidates (fallback_rules)",
+      "started_at": "2026-03-06T17:10:13",
+      "finished_at": "2026-03-06T17:10:22"
+    },
+    {
+      "name": "model_training",
+      "status": "done",
+      "detail": "trained 3 models",
+      "started_at": "2026-03-06T17:10:22",
+      "finished_at": "2026-03-06T17:10:25"
+    },
+    {
+      "name": "result_integration",
+      "status": "done",
+      "detail": "integration completed",
+      "started_at": "2026-03-06T17:10:25",
+      "finished_at": "2026-03-06T17:10:25"
     },
     {
       "name": "summary",
       "status": "done",
       "detail": "summary generated",
-      "started_at": "2026-03-05T16:28:53",
-      "finished_at": "2026-03-05T16:28:57"
+      "started_at": "2026-03-06T17:10:25",
+      "finished_at": "2026-03-06T17:10:29"
     }
   ],
   "date_column": "date",
@@ -17893,6 +17917,8 @@
     },
     "selected_model": "lstm"
   },
-  "summary_text": "Task: 针对etth数据集进行统计特性分析\nDataset: etth (data/ETTh1.csv)\nPlan: data_reading -> data_analysis -> summary\nStats: count=17420, mean=13.3247, std=8.5667, min=-4.0800, max=46.0070",
-  "report_path": "/Users/monychen/Documents/demo-zjl/output/report_20260305_162857.md"
+  "summary_text": "Task: 你好\nDataset: etth (data/ETTh1.csv)\nPlan: data_reading -> data_analysis -> model_selection -> model_training -> result_integration -> summary\nStats: count=17420, mean=13.3247, std=8.5667, min=-4.0800, max=46.0070\nModel Results:\n1. lstm | backend=fallback_linear | MAE=2.1560, RMSE=2.6962, MAPE=389382411.6755\n2. xgboost | backend=fallback_linear | MAE=3.8686, RMSE=4.5434, MAPE=566858208.9867\n3. arima | backend=statsmodels | MAE=4.2311, RMSE=5.0975, MAPE=250380835.4657\nEnsemble Selection: top_k=2, strategy=simple_average, rule=top_k_by_lowest_mae, members=lstm, xgboost\nEnsemble Member Details:\n1. lstm | weight=0.5000 | backend=fallback_linear | MAE=2.1560, RMSE=2.6962, MAPE=389382411.6755\n2. xgboost | weight=0.5000 | backend=fallback_linear | MAE=3.8686, RMSE=4.5434, MAPE=566858208.9867\nEnsemble Metrics: MAE=2.8034, RMSE=3.4377, MAPE=478120308.1680\nDelta vs Best Single: MAE=0.6474, RMSE=0.7414, MAPE=88737896.4925",
+  "report_path": "/Users/monychen/Documents/demo-zjl/output/report_20260306_171029.md",
+  "plan_source": "fallback_rules",
+  "plan_reason": "fallback_no_llm_payload"
 }
