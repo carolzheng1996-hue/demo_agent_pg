@@ -181,3 +181,16 @@
 - 未执行 Python 级验证（遵循仓库约定，需你本地执行验证命令）。
 - `5_DGagent` 与 `loongflow_DGagent` 已补齐本地 `tools/file_tools.py`、`tools/model_tools.py`、`tools/analysis_tools.py`，并增加脚本直跑导入兜底。
 - 两个目录现已支持在各自目录下直接执行 `python main.py`，不再要求以 `run_*.py` 作为主入口。
+
+## 2026-03-09 5_DGagent 目录内建模链路修复
+
+- [x] 定位 `python main.py` 建模任务未进入稳定训练链路的根因
+- [x] 修复 `llm_utils` 参数兼容，支持当前调用点透传的 `max_tokens/temperature`
+- [x] 修复 orchestrator fallback，在建模语义下生成包含训练步骤的计划
+- [x] 修复 `data_reading` 回退代码构造，避免缩进错误导致标准化执行失败
+- [x] 请用户运行建模命令验证 `model_selection/model_training/model_integration` 是否实际触发
+- [x] 验证通过后提交并推送到 `origin/dev`
+
+- 用户已确认 `5_DGagent` 目录内运行“看起来已经没问题”。
+- 本轮修复聚焦三个点：LLM 调用参数兼容、建模语义 fallback 计划、数据读取代码清洗与回退执行。
+- 运行产物 `.state/` 和 `__pycache__/` 已按既有仓库习惯保留在工作区，但本次提交仅纳入源码与任务记录。

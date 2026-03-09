@@ -48,7 +48,13 @@ def _parse_json_text(raw: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def invoke_text(system_prompt: str, user_prompt: str, model_name: Optional[str] = None) -> Optional[str]:
+def invoke_text(
+    system_prompt: str,
+    user_prompt: str,
+    model_name: Optional[str] = None,
+    max_tokens: Optional[int] = None,
+    temperature: Optional[float] = None,
+) -> Optional[str]:
     try:
         model = get_llm(model_name or "gpt-oss-120b", is_outside=_should_use_outside())
         response = model.invoke(f"{system_prompt}\n\n{user_prompt}")
@@ -57,7 +63,13 @@ def invoke_text(system_prompt: str, user_prompt: str, model_name: Optional[str] 
         return None
 
 
-def invoke_json(system_prompt: str, user_prompt: str, model_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def invoke_json(
+    system_prompt: str,
+    user_prompt: str,
+    model_name: Optional[str] = None,
+    max_tokens: Optional[int] = None,
+    temperature: Optional[float] = None,
+) -> Optional[Dict[str, Any]]:
     try:
         model = get_llm(model_name or "gpt-oss-120b", is_outside=_should_use_outside())
         response = model.invoke(

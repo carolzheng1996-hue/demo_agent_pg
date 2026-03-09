@@ -20,6 +20,21 @@ except ImportError:
     from tools import execute_user_code_safely
 
 
+def _sanitize_generated_code(code: str) -> str:
+    text = code.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    lines = text.splitlines()
+    while lines and not lines[0].strip():
+        lines = lines[1:]
+    return dedent("\n".join(lines)).strip() + "\n"
+
+
 def _ratio_payload(state: DGGlobalState) -> Dict[str, Optional[float]]:
     return {
         "train_ratio": state.read("train_ratio"),
@@ -44,43 +59,40 @@ def _validate_ratios(ratios: Dict[str, Optional[float]]) -> None:
 
 def _fallback_reader_code(date_col: Optional[str], target_col: str, feature_cols: List[str], need_split: bool) -> str:
     feature_literal = json.dumps(feature_cols, ensure_ascii=False)
-    split_block = ""
-    if need_split:
-        split_block = dedent(
-            """
-            n = len(df)
-            train_end = int(n * train_ratio)
-            val_end = train_end + int(n * val_ratio)
-            outputs["splits"] = {
-                "train": standardized_array[:train_end].tolist(),
-                "val": standardized_array[train_end:val_end].tolist(),
-                "test": standardized_array[val_end:].tolist(),
-            }
-            outputs["split_index"] = {"train_end": train_end, "val_end": val_end, "test_end": n}
-            """
-        ).strip()
-
-    date_stmt = ""
+    lines = [
+        "outputs = {}",
+        "df = raw_df.copy()",
+    ]
     if date_col:
-        date_stmt = f"df[{date_col!r}] = pd.to_datetime(df[{date_col!r}])"
-
-    return dedent(
-        f"""
-        outputs = {{}}
-        df = raw_df.copy()
-        {date_stmt}
-        feature_cols = {feature_literal}
-        target_col = {target_col!r}
-        standardized_df = df[feature_cols + [target_col]].copy() if feature_cols else df[[target_col]].copy()
-        standardized_df = standardized_df.apply(pd.to_numeric, errors="coerce")
-        standardized_df = standardized_df.fillna(method="ffill").fillna(method="bfill")
-        standardized_array = standardized_df.to_numpy(dtype=float)
-        outputs["standardized_df"] = standardized_df
-        outputs["standardized_array"] = standardized_array
-        outputs["target_array"] = standardized_df[target_col].to_numpy(dtype=float)
-        {split_block}
-        """
-    ).strip() + "\n"
+        lines.append(f"df[{date_col!r}] = pd.to_datetime(df[{date_col!r}])")
+    lines.extend(
+        [
+            f"feature_cols = {feature_literal}",
+            f"target_col = {target_col!r}",
+            "standardized_df = df[feature_cols + [target_col]].copy() if feature_cols else df[[target_col]].copy()",
+            'standardized_df = standardized_df.apply(pd.to_numeric, errors="coerce")',
+            'standardized_df = standardized_df.ffill().bfill()',
+            "standardized_array = standardized_df.to_numpy(dtype=float)",
+            'outputs["standardized_df"] = standardized_df',
+            'outputs["standardized_array"] = standardized_array',
+            'outputs["target_array"] = standardized_df[target_col].to_numpy(dtype=float)',
+        ]
+    )
+    if need_split:
+        lines.extend(
+            [
+                "n = len(df)",
+                "train_end = int(n * train_ratio)",
+                "val_end = train_end + int(n * val_ratio)",
+                'outputs["splits"] = {',
+                '    "train": standardized_array[:train_end].tolist(),',
+                '    "val": standardized_array[train_end:val_end].tolist(),',
+                '    "test": standardized_array[val_end:].tolist(),',
+                "}",
+                'outputs["split_index"] = {"train_end": train_end, "val_end": val_end, "test_end": n}',
+            ]
+        )
+    return "\n".join(lines) + "\n"
 
 
 def _generate_reader_code(state: DGGlobalState, df: pd.DataFrame, date_col: Optional[str], target_col: str, feature_cols: List[str], need_split: bool) -> str:
@@ -108,7 +120,7 @@ def _generate_reader_code(state: DGGlobalState, df: pd.DataFrame, date_col: Opti
         max_tokens=600,
         temperature=0.0,
     )
-    return text.strip() if text else fallback
+    return _sanitize_generated_code(text) if text else fallback
 
 
 def run(state: DGGlobalState) -> Dict:
@@ -165,18 +177,23 @@ def run(state: DGGlobalState) -> Dict:
             "pause_execution": True,
         }
 
-    executed = execute_user_code_safely(
-        generated_code,
-        {
-            "raw_df": df.copy(),
-            "train_ratio": ratios.get("train_ratio"),
-            "val_ratio": ratios.get("val_ratio"),
-            "test_ratio": ratios.get("test_ratio"),
-        },
-    )
-    standardized_df = executed.get("standardized_df")
-    standardized_array = executed.get("standardized_array")
-    target_array = executed.get("target_array")
+    execution_context = {
+        "raw_df": df.copy(),
+        "train_ratio": ratios.get("train_ratio"),
+        "val_ratio": ratios.get("val_ratio"),
+        "test_ratio": ratios.get("test_ratio"),
+    }
+    try:
+        executed = execute_user_code_safely(generated_code, execution_context)
+        executed_code = generated_code
+    except Exception:
+        fallback_code = _fallback_reader_code(date_col, target_col, feature_cols, need_split)
+        executed = execute_user_code_safely(fallback_code, execution_context)
+        executed_code = fallback_code
+    outputs_payload = executed.get("outputs", {}) if isinstance(executed.get("outputs"), dict) else {}
+    standardized_df = executed.get("standardized_df", outputs_payload.get("standardized_df"))
+    standardized_array = executed.get("standardized_array", outputs_payload.get("standardized_array"))
+    target_array = executed.get("target_array", outputs_payload.get("target_array"))
     if standardized_df is None or standardized_array is None or target_array is None:
         raise RuntimeError("Generated data reading code did not produce required outputs.")
 
@@ -188,7 +205,7 @@ def run(state: DGGlobalState) -> Dict:
     state.write_runtime("standardized_df", standardized_df)
     state.write_runtime("standardized_array", standardized_array)
     state.write_runtime("target_array", target_array)
-    state.write_runtime("split_payload", executed.get("splits"))
+    state.write_runtime("split_payload", executed.get("splits", outputs_payload.get("splits")))
     state.update(
         {
             "dataset_profile": {
@@ -203,6 +220,10 @@ def run(state: DGGlobalState) -> Dict:
                 "split_ratios": ratios if need_split else None,
             },
             "awaiting_user_confirmation": None,
+            "data_reader_execution": {
+                "code_source": "generated" if executed_code == generated_code else "fallback",
+                "executed_code": executed_code,
+            },
         }
     )
 
