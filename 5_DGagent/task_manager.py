@@ -5,7 +5,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 
-from .config import TASKS_FILE
+try:
+    from .config import TASKS_FILE
+except ImportError:
+    from config import TASKS_FILE
 
 
 def _now_iso() -> str:

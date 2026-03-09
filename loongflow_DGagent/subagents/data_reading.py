@@ -8,11 +8,16 @@ from typing import Dict, List, Optional
 import numpy as np
 import pandas as pd
 
-from tools.file_tools import detect_date, set_features, set_target
-
-from ..llm_utils import invoke_text
-from ..state import DGGlobalState
-from ..tools import execute_user_code_safely, write_step_artifact
+try:
+    from ..tools.file_tools import detect_date, set_features, set_target
+    from ..llm_utils import invoke_text
+    from ..state import DGGlobalState
+    from ..tools import execute_user_code_safely, write_step_artifact
+except ImportError:
+    from tools.file_tools import detect_date, set_features, set_target
+    from llm_utils import invoke_text
+    from state import DGGlobalState
+    from tools import execute_user_code_safely, write_step_artifact
 
 
 def _ratio_payload(state: DGGlobalState) -> Dict[str, Optional[float]]:

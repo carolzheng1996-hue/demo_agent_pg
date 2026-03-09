@@ -6,8 +6,12 @@ from pathlib import Path
 from typing import Any, List
 from uuid import uuid4
 
-from ..config import OUTPUT_DIR
-from ..state import DGGlobalState
+try:
+    from ..config import OUTPUT_DIR
+    from ..state import DGGlobalState
+except ImportError:
+    from config import OUTPUT_DIR
+    from state import DGGlobalState
 
 
 def _dump(payload: Any) -> str:

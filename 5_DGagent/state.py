@@ -5,7 +5,10 @@ import threading
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from .config import STATE_FILE
+try:
+    from .config import STATE_FILE
+except ImportError:
+    from config import STATE_FILE
 
 
 class DGGlobalState:

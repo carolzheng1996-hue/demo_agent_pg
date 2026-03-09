@@ -5,9 +5,7 @@
 当前版本已切换为直接使用 `5_DGagent/LLM/` 中提供的 LLM 调用代码，统一采用：
 
 ```python
-from importlib import import_module
-
-get_llm = import_module("5_DGagent.LLM").get_llm
+from LLM import get_llm
 model = get_llm()
 resp = model.invoke("hello")
 ```
@@ -104,9 +102,10 @@ resp = model.invoke("hello")
 ### 1. 仅生成数据读取代码并等待确认
 
 ```bash
-python run_5_dgagent.py \
+cd 5_DGagent
+python main.py \
   --query "针对 ETTh1 数据做统计特性分析" \
-  --dataset-path data/ETTh1.csv
+  --dataset-path ../data/ETTh1.csv
 ```
 
 行为：
@@ -118,9 +117,10 @@ python run_5_dgagent.py \
 ### 2. 用户确认后执行标准化和分析
 
 ```bash
-python run_5_dgagent.py \
+cd 5_DGagent
+python main.py \
   --query "针对 ETTh1 数据做统计特性分析" \
-  --dataset-path data/ETTh1.csv \
+  --dataset-path ../data/ETTh1.csv \
   --approve-generated-code
 ```
 
@@ -132,9 +132,10 @@ python run_5_dgagent.py \
 ### 3. 建模任务
 
 ```bash
-python run_5_dgagent.py \
+cd 5_DGagent
+python main.py \
   --query "针对 ETTh1 数据构建一个时序预测模型" \
-  --dataset-path data/ETTh1.csv \
+  --dataset-path ../data/ETTh1.csv \
   --approve-generated-code \
   --train-ratio 0.7 \
   --val-ratio 0.1 \
@@ -179,4 +180,5 @@ User Query
 - 集成方式按你的要求实现为“三模型输出简单平均”。
 - 代码执行沙箱是轻量级受限 `exec` 上下文，不是容器级隔离；因此仍建议保留人工审查流程。
 - `5_DGagent` 已不再使用仓库根目录的 `llm_client.py`。
+- `5_DGagent` 已内置本地依赖工具模块，可直接在目录内执行 `python main.py`，不依赖上一级源码模块。
 - 本次未在仓库内直接运行 Python 验证，遵循项目约定，由你本地执行命令确认。

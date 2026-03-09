@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from typing import Dict
 
-from ..state import DGGlobalState
-from ..tools import write_step_artifact
+try:
+    from ..state import DGGlobalState
+    from ..tools import write_step_artifact
+except ImportError:
+    from state import DGGlobalState
+    from tools import write_step_artifact
 
 
 def run(state: DGGlobalState) -> Dict:

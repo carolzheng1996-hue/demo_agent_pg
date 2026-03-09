@@ -3,14 +3,24 @@ from __future__ import annotations
 import json
 from typing import Dict, List, Tuple
 
-from .agent_loop import agent_loop, run_subagent
-from .config import DEFAULT_MAX_ITERATIONS, MAX_ITERATIONS_CAP, PLAN_FILE
-from .llm_utils import invoke_json
-from .state import DGGlobalState
-from .subagents import SUBAGENT_REGISTRY
-from .task_manager import DGTaskManager
-from .teams import TEAM_REGISTRY
-from .tools import ensure_task_context, prepare_iteration_artifacts, write_task_text_artifact
+try:
+    from .agent_loop import agent_loop, run_subagent
+    from .config import DEFAULT_MAX_ITERATIONS, MAX_ITERATIONS_CAP, PLAN_FILE
+    from .llm_utils import invoke_json
+    from .state import DGGlobalState
+    from .subagents import SUBAGENT_REGISTRY
+    from .task_manager import DGTaskManager
+    from .teams import TEAM_REGISTRY
+    from .tools import ensure_task_context, prepare_iteration_artifacts, write_task_text_artifact
+except ImportError:
+    from agent_loop import agent_loop, run_subagent
+    from config import DEFAULT_MAX_ITERATIONS, MAX_ITERATIONS_CAP, PLAN_FILE
+    from llm_utils import invoke_json
+    from state import DGGlobalState
+    from subagents import SUBAGENT_REGISTRY
+    from task_manager import DGTaskManager
+    from teams import TEAM_REGISTRY
+    from tools import ensure_task_context, prepare_iteration_artifacts, write_task_text_artifact
 
 
 class DGOrchestrator:

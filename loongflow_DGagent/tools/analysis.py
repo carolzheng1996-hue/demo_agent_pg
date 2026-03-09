@@ -4,7 +4,10 @@ from typing import Any, Dict
 
 import pandas as pd
 
-from tools.analysis_tools import ACF, distribution, seasonality, stationarity, statistics, trend
+try:
+    from .analysis_tools import ACF, distribution, seasonality, stationarity, statistics, trend
+except ImportError:
+    from analysis_tools import ACF, distribution, seasonality, stationarity, statistics, trend
 
 
 def summarize_dataframe(df: pd.DataFrame) -> Dict[str, Any]:

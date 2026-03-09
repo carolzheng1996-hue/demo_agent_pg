@@ -3,10 +3,16 @@ from __future__ import annotations
 import json
 from typing import Dict, List
 
-from ..config import DEFAULT_ALLOWED_MODELS, DEFAULT_TRAINING_PARAMS
-from ..llm_utils import invoke_json
-from ..state import DGGlobalState
-from ..tools import write_step_artifact
+try:
+    from ..config import DEFAULT_ALLOWED_MODELS, DEFAULT_TRAINING_PARAMS
+    from ..llm_utils import invoke_json
+    from ..state import DGGlobalState
+    from ..tools import write_step_artifact
+except ImportError:
+    from config import DEFAULT_ALLOWED_MODELS, DEFAULT_TRAINING_PARAMS
+    from llm_utils import invoke_json
+    from state import DGGlobalState
+    from tools import write_step_artifact
 
 
 FALLBACK_MODELS = [

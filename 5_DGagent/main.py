@@ -3,10 +3,16 @@ from __future__ import annotations
 import argparse
 import json
 
-from .config import ensure_directories
-from .orchestrator import DGOrchestrator
-from .state import DGGlobalState
-from .task_manager import DGTaskManager
+try:
+    from .config import ensure_directories
+    from .orchestrator import DGOrchestrator
+    from .state import DGGlobalState
+    from .task_manager import DGTaskManager
+except ImportError:
+    from config import ensure_directories
+    from orchestrator import DGOrchestrator
+    from state import DGGlobalState
+    from task_manager import DGTaskManager
 
 
 def parse_args() -> argparse.Namespace:

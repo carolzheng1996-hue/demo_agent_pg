@@ -3,9 +3,14 @@ from __future__ import annotations
 import json
 from typing import Dict
 
-from ..llm_utils import invoke_json
-from ..state import DGGlobalState
-from ..tools import compute_full_analysis, write_step_artifact
+try:
+    from ..llm_utils import invoke_json
+    from ..state import DGGlobalState
+    from ..tools import compute_full_analysis, write_step_artifact
+except ImportError:
+    from llm_utils import invoke_json
+    from state import DGGlobalState
+    from tools import compute_full_analysis, write_step_artifact
 
 
 def run(state: DGGlobalState) -> Dict:

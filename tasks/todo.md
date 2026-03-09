@@ -179,3 +179,5 @@
 - `loongflow_DGagent/orchestrator.py` 已支持审批后的多轮建模优化，默认 3 轮，最大不超过 10 轮。
 - `loongflow_DGagent/output/<task-id>/<iteration-id>/` 下会输出 `plan.json`、各阶段结果和 `summary.md`，任务根目录会输出 `final_summary.md` 与 `iteration_history.json`。
 - 未执行 Python 级验证（遵循仓库约定，需你本地执行验证命令）。
+- `5_DGagent` 与 `loongflow_DGagent` 已补齐本地 `tools/file_tools.py`、`tools/model_tools.py`、`tools/analysis_tools.py`，并增加脚本直跑导入兜底。
+- 两个目录现已支持在各自目录下直接执行 `python main.py`，不再要求以 `run_*.py` 作为主入口。

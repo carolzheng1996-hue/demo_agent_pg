@@ -93,7 +93,7 @@ User Query
 
 ```text
 User Query
-  -> run_5_dgagent.py
+  -> 5_DGagent/main.py
   -> 5_DGagent.main
   -> DGOrchestrator
   -> teams + normalized subagent plan

@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from typing import Callable, Dict, List
 
-from .state import DGGlobalState
-from .task_manager import DGTaskManager
+try:
+    from .state import DGGlobalState
+    from .task_manager import DGTaskManager
+except ImportError:
+    from state import DGGlobalState
+    from task_manager import DGTaskManager
 
 SubagentFunc = Callable[[DGGlobalState], Dict]
 

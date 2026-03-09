@@ -5,10 +5,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 
-from ..config import OUTPUT_DIR
-from ..llm_utils import invoke_text
-from ..state import DGGlobalState
-from ..tools import write_step_artifact, write_task_text_artifact
+try:
+    from ..config import OUTPUT_DIR
+    from ..llm_utils import invoke_text
+    from ..state import DGGlobalState
+    from ..tools import write_step_artifact, write_task_text_artifact
+except ImportError:
+    from config import OUTPUT_DIR
+    from llm_utils import invoke_text
+    from state import DGGlobalState
+    from tools import write_step_artifact, write_task_text_artifact
 
 
 def _lines_for_models(rows: List[Dict]) -> List[str]:

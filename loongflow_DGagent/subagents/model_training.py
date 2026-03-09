@@ -5,10 +5,14 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 
-from tools.model_tools import train_arima, train_lstm, train_xgboost
-
-from ..state import DGGlobalState
-from ..tools import compare_models_with_metrics, compute_metrics_extended, write_step_artifact
+try:
+    from ..tools.model_tools import train_arima, train_lstm, train_xgboost
+    from ..state import DGGlobalState
+    from ..tools import compare_models_with_metrics, compute_metrics_extended, write_step_artifact
+except ImportError:
+    from tools.model_tools import train_arima, train_lstm, train_xgboost
+    from state import DGGlobalState
+    from tools import compare_models_with_metrics, compute_metrics_extended, write_step_artifact
 
 
 def run(state: DGGlobalState) -> Dict:

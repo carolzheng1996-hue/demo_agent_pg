@@ -1,15 +1,27 @@
-from . import (
-    data_analysis,
-    data_reading,
-    evaluator,
-    feature_engineering,
-    model_integration,
-    model_selection,
-    model_training,
-    preprocess,
-    split_strategy,
-    summary,
-)
+try:
+    from . import (
+        data_analysis,
+        data_reading,
+        evaluator,
+        feature_engineering,
+        model_integration,
+        model_selection,
+        model_training,
+        preprocess,
+        split_strategy,
+        summary,
+    )
+except ImportError:
+    import data_analysis
+    import data_reading
+    import evaluator
+    import feature_engineering
+    import model_integration
+    import model_selection
+    import model_training
+    import preprocess
+    import split_strategy
+    import summary
 
 SUBAGENT_REGISTRY = {
     "data_reading": data_reading.run,

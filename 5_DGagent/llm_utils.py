@@ -4,7 +4,10 @@ import json
 import os
 from typing import Any, Dict, Optional
 
-from .LLM import get_llm
+try:
+    from .LLM import get_llm
+except ImportError:
+    from LLM import get_llm
 
 
 def _should_use_outside() -> bool:

@@ -3,13 +3,22 @@ from __future__ import annotations
 import json
 from typing import Dict, List, Tuple
 
-from .agent_loop import agent_loop
-from .config import PLAN_FILE
-from .llm_utils import invoke_json
-from .state import DGGlobalState
-from .subagents import SUBAGENT_REGISTRY
-from .task_manager import DGTaskManager
-from .teams import TEAM_REGISTRY
+try:
+    from .agent_loop import agent_loop
+    from .config import PLAN_FILE
+    from .llm_utils import invoke_json
+    from .state import DGGlobalState
+    from .subagents import SUBAGENT_REGISTRY
+    from .task_manager import DGTaskManager
+    from .teams import TEAM_REGISTRY
+except ImportError:
+    from agent_loop import agent_loop
+    from config import PLAN_FILE
+    from llm_utils import invoke_json
+    from state import DGGlobalState
+    from subagents import SUBAGENT_REGISTRY
+    from task_manager import DGTaskManager
+    from teams import TEAM_REGISTRY
 
 
 class DGOrchestrator:

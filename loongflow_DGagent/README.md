@@ -130,26 +130,29 @@ loongflow_DGagent/output/
 ### 1. 仅生成读取代码并等待审批
 
 ```bash
-python run_loongflow_dgagent.py \
+cd loongflow_DGagent
+python main.py \
   --query "针对 ETTh1 数据做统计特性分析" \
-  --dataset-path data/ETTh1.csv
+  --dataset-path ../data/ETTh1.csv
 ```
 
 ### 2. 审批后执行统计分析
 
 ```bash
-python run_loongflow_dgagent.py \
+cd loongflow_DGagent
+python main.py \
   --query "针对 ETTh1 数据做统计特性分析" \
-  --dataset-path data/ETTh1.csv \
+  --dataset-path ../data/ETTh1.csv \
   --approve-generated-code
 ```
 
 ### 3. 执行多轮建模优化
 
 ```bash
-python run_loongflow_dgagent.py \
+cd loongflow_DGagent
+python main.py \
   --query "针对 ETTh1 数据构建一个时序预测模型" \
-  --dataset-path data/ETTh1.csv \
+  --dataset-path ../data/ETTh1.csv \
   --approve-generated-code \
   --train-ratio 0.7 \
   --val-ratio 0.1 \
@@ -162,3 +165,4 @@ python run_loongflow_dgagent.py \
 - `5_DGagent` 保持原样不动
 - `loongflow_DGagent` 是一套新的试验性增强版本
 - 如果后续验证效果稳定，再考虑是否把其中一部分能力回迁到原架构
+- `loongflow_DGagent` 也已内置本地依赖工具模块，可直接在目录内执行 `python main.py`，不依赖上一级源码模块

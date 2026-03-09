@@ -2,9 +2,14 @@ from __future__ import annotations
 
 from typing import Dict
 
-from ..config import DEFAULT_MAX_ITERATIONS
-from ..state import DGGlobalState
-from ..tools import evaluate_iteration, write_step_artifact
+try:
+    from ..config import DEFAULT_MAX_ITERATIONS
+    from ..state import DGGlobalState
+    from ..tools import evaluate_iteration, write_step_artifact
+except ImportError:
+    from config import DEFAULT_MAX_ITERATIONS
+    from state import DGGlobalState
+    from tools import evaluate_iteration, write_step_artifact
 
 
 def run(state: DGGlobalState) -> Dict:

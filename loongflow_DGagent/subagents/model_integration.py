@@ -4,8 +4,12 @@ from typing import Dict
 
 import numpy as np
 
-from ..state import DGGlobalState
-from ..tools import mean_ensemble, write_step_artifact
+try:
+    from ..state import DGGlobalState
+    from ..tools import mean_ensemble, write_step_artifact
+except ImportError:
+    from state import DGGlobalState
+    from tools import mean_ensemble, write_step_artifact
 
 
 def run(state: DGGlobalState) -> Dict:

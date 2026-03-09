@@ -1,4 +1,12 @@
-from . import data_analysis, data_reading, model_integration, model_selection, model_training, summary
+try:
+    from . import data_analysis, data_reading, model_integration, model_selection, model_training, summary
+except ImportError:
+    import data_analysis
+    import data_reading
+    import model_integration
+    import model_selection
+    import model_training
+    import summary
 
 SUBAGENT_REGISTRY = {
     "data_reading": data_reading.run,
