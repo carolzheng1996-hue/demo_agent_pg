@@ -1,0 +1,98 @@
+{
+  "api_config": {
+    "provider": "openai",
+    "base_url": "https://yibuapi.com/v1",
+    "api_key": "sk-3FFyLKv6tlMOWoplzIj9pA8skTAjmxURAbOfbAcXl125OTGP",
+    "model": "gpt-5.1",
+    "trust_env_proxy": "false",
+    "timeout_seconds": "60"
+  },
+  "approve_generated_code": false,
+  "train_ratio": null,
+  "val_ratio": null,
+  "test_ratio": null,
+  "user_query": "针对 ETTh1 数据做统计特性分析",
+  "dataset_name": "custom",
+  "dataset_path": "data/ETTh1.csv",
+  "plan": [
+    "data_reading",
+    "data_analysis",
+    "summary"
+  ],
+  "plan_meta": {
+    "task_type": "analysis_only",
+    "requires_modeling": false,
+    "requires_split": false,
+    "teams": [
+      "discovery_team",
+      "reporting_team"
+    ],
+    "reason": "llm_unavailable_default_to_analysis_only",
+    "plan_source": "fallback"
+  },
+  "selected_teams": [
+    "discovery_team",
+    "reporting_team"
+  ],
+  "tasks": [
+    {
+      "name": "data_reading",
+      "status": "done",
+      "detail": "generated data reading code; awaiting user confirmation",
+      "started_at": "2026-03-09T10:29:52",
+      "finished_at": "2026-03-09T10:29:56"
+    },
+    {
+      "name": "data_analysis",
+      "status": "pending",
+      "detail": "",
+      "started_at": "",
+      "finished_at": ""
+    },
+    {
+      "name": "summary",
+      "status": "pending",
+      "detail": "",
+      "started_at": "",
+      "finished_at": ""
+    }
+  ],
+  "data_reader_proposal": {
+    "generated_code": "outputs = {}\ndf = raw_df.copy()\ndf['date'] = pd.to_datetime(df['date'])\nfeature_cols = [\"HUFL\", \"HULL\", \"MUFL\", \"MULL\", \"LUFL\", \"LULL\"]\ntarget_col = 'OT'\nstandardized_df = df[feature_cols + [target_col]].copy() if feature_cols else df[[target_col]].copy()\nstandardized_df = standardized_df.apply(pd.to_numeric, errors=\"coerce\")\nstandardized_df = standardized_df.fillna(method=\"ffill\").fillna(method=\"bfill\")\nstandardized_array = standardized_df.to_numpy(dtype=float)\noutputs[\"standardized_df\"] = standardized_df\noutputs[\"standardized_array\"] = standardized_array\noutputs[\"target_array\"] = standardized_df[target_col].to_numpy(dtype=float)\n",
+    "requires_user_confirmation": true,
+    "approved": false
+  },
+  "dataset_profile": {
+    "dataset_path": "data/ETTh1.csv",
+    "shape": [
+      17420,
+      8
+    ],
+    "columns": [
+      "date",
+      "HUFL",
+      "HULL",
+      "MUFL",
+      "MULL",
+      "LUFL",
+      "LULL",
+      "OT"
+    ],
+    "date_column": "date",
+    "target_column": "OT",
+    "feature_columns": [
+      "HUFL",
+      "HULL",
+      "MUFL",
+      "MULL",
+      "LUFL",
+      "LULL"
+    ],
+    "need_split": false,
+    "split_ratios": null
+  },
+  "awaiting_user_confirmation": {
+    "subagent": "data_reading",
+    "action": "review_generated_code_and_rerun_with_approval"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "plan": [
+    "data_reading",
+    "data_analysis",
+    "summary"
+  ],
+  "plan_meta": {
+    "task_type": "analysis_only",
+    "requires_modeling": false,
+    "requires_split": false,
+    "teams": [
+      "discovery_team",
+      "reporting_team"
+    ],
+    "reason": "llm_unavailable_default_to_analysis_only",
+    "plan_source": "fallback"
+  }
+}
