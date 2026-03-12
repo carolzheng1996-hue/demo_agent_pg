@@ -1,0 +1,14 @@
+{
+  "task_id": "20260311_201953_516c2cdd",
+  "iteration_id": "iteration_001",
+  "iteration_index": 1,
+  "plan": [
+    "data_reading",
+    "data_formatter",
+    "data_analysis",
+    "feature_engineering",
+    "summary"
+  ],
+  "user_query": "针对 ETTh1 数据进行统计分析",
+  "task_type": "analysis_only"
+}

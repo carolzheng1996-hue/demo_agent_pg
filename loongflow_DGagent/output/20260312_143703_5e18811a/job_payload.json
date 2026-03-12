@@ -1,0 +1,21 @@
+{
+  "query": "针对 ETTh1 数据构建一个时序预测模型",
+  "dataset_path": "/Users/monychen/Documents/demo-zjl/data/ETTh1.csv",
+  "dataset_name": "ETTh1",
+  "target_col": "OT",
+  "approve_generated_code": false,
+  "train_ratio": 0.7,
+  "val_ratio": 0.1,
+  "test_ratio": 0.2,
+  "use_custom_processing": false,
+  "custom_processing_steps": "",
+  "input_length": 96,
+  "output_length": 24,
+  "time_increment": 1,
+  "normalization_policy": "auto",
+  "max_iterations": 3,
+  "approved_generated_codes": {
+    "data_formatter": "outputs = {}\ndf = raw_df.copy()\ndf['date'] = pd.to_datetime(df['date'], errors='coerce')\nfeature_cols = [\"HUFL\", \"HULL\", \"MUFL\", \"MULL\", \"LUFL\", \"LULL\"]\ntarget_cols = [\"OT\"]\nprimary_target_col = target_cols[0]\nworking_df = df.copy()\nnumeric_candidates = feature_cols + target_cols\nfor col in numeric_candidates:\n    if col in working_df.columns:\n        working_df[col] = pd.to_numeric(working_df[col], errors='coerce')\nworking_df = working_df.ffill().bfill()\nstandardized_df = working_df[feature_cols + target_cols].copy() if feature_cols else working_df[target_cols].copy()\nstandardized_df = standardized_df.fillna(0.0)\nstandardized_array = standardized_df.to_numpy(dtype=float)\noutputs[\"standardized_df\"] = standardized_df\noutputs[\"standardized_array\"] = standardized_array\noutputs[\"target_array\"] = standardized_df[target_cols].to_numpy(dtype=float)\noutputs[\"target_columns\"] = target_cols\noutputs[\"primary_target_col\"] = primary_target_col\nn = len(standardized_df)\ntrain_end = int(n * train_ratio)\nval_end = train_end + int(n * val_ratio)\noutputs[\"split_index\"] = {\"train_end\": train_end, \"val_end\": val_end, \"test_end\": n}\n",
+    "split_strategy": "outputs = {}\nrows = int(rows)\ntrain_ratio = float(train_ratio)\nval_ratio = float(val_ratio)\ntest_ratio = float(test_ratio)\ntrain_end = int(rows * train_ratio)\nval_end = train_end + int(rows * val_ratio)\noutputs['strategy'] = 'time_order_split'\noutputs['rows'] = rows\noutputs['ratios'] = {\n    'train_ratio': train_ratio,\n    'val_ratio': val_ratio,\n    'test_ratio': test_ratio,\n}\noutputs['window_config'] = {\"input_length\": 96, \"output_length\": 24, \"time_increment\": 1}\noutputs['indices'] = {\n    'train': [0, train_end],\n    'val': [train_end, val_end],\n    'test': [val_end, rows],\n}\n"
+  }
+}

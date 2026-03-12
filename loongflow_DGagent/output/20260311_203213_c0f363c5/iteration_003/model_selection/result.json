@@ -1,0 +1,40 @@
+{
+  "models": [
+    {
+      "name": "arima",
+      "params": {
+        "order": [
+          1,
+          1,
+          2
+        ]
+      },
+      "reason": "第3轮统计基线扰动"
+    },
+    {
+      "name": "xgboost",
+      "params": {
+        "window": 24,
+        "n_estimators": 240,
+        "max_depth": 4,
+        "learning_rate": 0.05
+      },
+      "reason": "第3轮树模型参数搜索"
+    },
+    {
+      "name": "lstm",
+      "params": {
+        "seq_len": 48,
+        "hidden_size": 80,
+        "num_layers": 2,
+        "dropout": 0.1,
+        "epochs": 9,
+        "lr": 0.0007,
+        "batch_size": 64
+      },
+      "reason": "第3轮深度模型参数搜索"
+    }
+  ],
+  "selection_source": "fallback",
+  "iteration_index": 3
+}

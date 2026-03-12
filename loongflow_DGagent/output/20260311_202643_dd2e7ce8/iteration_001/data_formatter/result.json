@@ -1,0 +1,90 @@
+{
+  "approved": true,
+  "dataset_profile": {
+    "dataset_path": "/Users/monychen/Documents/demo-zjl/data/ETTh1.csv",
+    "selected_file": "/Users/monychen/Documents/demo-zjl/data/ETTh1.csv",
+    "shape": [
+      17420,
+      8
+    ],
+    "columns": [
+      "date",
+      "HUFL",
+      "HULL",
+      "MUFL",
+      "MULL",
+      "LUFL",
+      "LULL",
+      "OT"
+    ],
+    "date_column": "date",
+    "target_column": "OT",
+    "feature_columns": [
+      "HUFL",
+      "HULL",
+      "MUFL",
+      "MULL",
+      "LUFL",
+      "LULL"
+    ],
+    "use_custom_processing": false,
+    "custom_processing_steps": "",
+    "need_split": true,
+    "split_ratios": {
+      "train_ratio": 0.7,
+      "val_ratio": 0.1,
+      "test_ratio": 0.2
+    },
+    "standardized_shape": [
+      17420,
+      7
+    ]
+  },
+  "standardized_preview_rows": [
+    {
+      "HUFL": 5.827000141143799,
+      "HULL": 2.009000062942505,
+      "MUFL": 1.5989999771118164,
+      "MULL": 0.4620000123977661,
+      "LUFL": 4.203000068664552,
+      "LULL": 1.3400000333786009,
+      "OT": 30.5310001373291
+    },
+    {
+      "HUFL": 5.692999839782715,
+      "HULL": 2.075999975204468,
+      "MUFL": 1.4919999837875366,
+      "MULL": 0.4259999990463257,
+      "LUFL": 4.142000198364259,
+      "LULL": 1.371000051498413,
+      "OT": 27.78700065612793
+    },
+    {
+      "HUFL": 5.1570000648498535,
+      "HULL": 1.741000056266785,
+      "MUFL": 1.2790000438690186,
+      "MULL": 0.3549999892711639,
+      "LUFL": 3.776999950408936,
+      "LULL": 1.218000054359436,
+      "OT": 27.78700065612793
+    },
+    {
+      "HUFL": 5.0900001525878915,
+      "HULL": 1.9420000314712524,
+      "MUFL": 1.2790000438690186,
+      "MULL": 0.3910000026226044,
+      "LUFL": 3.806999921798706,
+      "LULL": 1.2790000438690186,
+      "OT": 25.04400062561035
+    },
+    {
+      "HUFL": 5.357999801635742,
+      "HULL": 1.9420000314712524,
+      "MUFL": 1.4919999837875366,
+      "MULL": 0.4620000123977661,
+      "LUFL": 3.868000030517578,
+      "LULL": 1.2790000438690186,
+      "OT": 21.947999954223643
+    }
+  ]
+}

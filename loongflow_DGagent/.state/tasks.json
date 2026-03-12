@@ -1,0 +1,86 @@
+[
+  {
+    "name": "data_reading",
+    "status": "done",
+    "detail": "dataset loaded successfully",
+    "started_at": "2026-03-12T14:37:15",
+    "finished_at": "2026-03-12T14:37:15"
+  },
+  {
+    "name": "data_formatter",
+    "status": "done",
+    "detail": "data formatted successfully",
+    "started_at": "2026-03-12T14:37:15",
+    "finished_at": "2026-03-12T14:37:15"
+  },
+  {
+    "name": "data_analysis",
+    "status": "done",
+    "detail": "data analysis completed",
+    "started_at": "2026-03-12T14:37:15",
+    "finished_at": "2026-03-12T14:37:16"
+  },
+  {
+    "name": "feature_engineering",
+    "status": "done",
+    "detail": "feature engineering completed",
+    "started_at": "2026-03-12T14:37:16",
+    "finished_at": "2026-03-12T14:37:16"
+  },
+  {
+    "name": "split_strategy",
+    "status": "done",
+    "detail": "split strategy prepared",
+    "started_at": "2026-03-12T14:37:16",
+    "finished_at": "2026-03-12T14:37:16"
+  },
+  {
+    "name": "datanorm",
+    "status": "done",
+    "detail": "normalization policy decided",
+    "started_at": "2026-03-12T14:37:16",
+    "finished_at": "2026-03-12T14:37:16"
+  },
+  {
+    "name": "preprocess",
+    "status": "done",
+    "detail": "preprocess completed",
+    "started_at": "2026-03-12T14:37:16",
+    "finished_at": "2026-03-12T14:37:16"
+  },
+  {
+    "name": "model_selection",
+    "status": "done",
+    "detail": "selected three models",
+    "started_at": "2026-03-12T14:37:20",
+    "finished_at": "2026-03-12T14:37:20"
+  },
+  {
+    "name": "model_training",
+    "status": "done",
+    "detail": "trained selected models",
+    "started_at": "2026-03-12T14:37:20",
+    "finished_at": "2026-03-12T14:37:21"
+  },
+  {
+    "name": "model_integration",
+    "status": "done",
+    "detail": "integrated three model outputs by averaging",
+    "started_at": "2026-03-12T14:37:21",
+    "finished_at": "2026-03-12T14:37:21"
+  },
+  {
+    "name": "evaluator",
+    "status": "done",
+    "detail": "iteration evaluated",
+    "started_at": "2026-03-12T14:37:21",
+    "finished_at": "2026-03-12T14:37:21"
+  },
+  {
+    "name": "summary",
+    "status": "done",
+    "detail": "summary report generated",
+    "started_at": "2026-03-12T14:37:21",
+    "finished_at": "2026-03-12T14:37:21"
+  }
+]

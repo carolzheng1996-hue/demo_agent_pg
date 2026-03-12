@@ -1,0 +1,21 @@
+{
+  "task_id": "20260312_114959_615cb742",
+  "iteration_id": "iteration_003",
+  "iteration_index": 3,
+  "plan": [
+    "data_reading",
+    "data_formatter",
+    "data_analysis",
+    "feature_engineering",
+    "split_strategy",
+    "datanorm",
+    "preprocess",
+    "model_selection",
+    "model_training",
+    "model_integration",
+    "evaluator",
+    "summary"
+  ],
+  "user_query": "针对 ETTh1 数据构建一个时序预测模型",
+  "task_type": "forecast_modeling"
+}

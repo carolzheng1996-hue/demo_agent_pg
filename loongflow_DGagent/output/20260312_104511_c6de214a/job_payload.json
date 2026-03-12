@@ -1,0 +1,17 @@
+{
+  "query": "针对 ETTh1 数据构建时间序列预测模型，预测目标LULL这一列",
+  "dataset_path": "/Users/monychen/Documents/demo-zjl/data/ETTh1.csv",
+  "dataset_name": "ETTh1",
+  "approve_generated_code": false,
+  "train_ratio": 0.7,
+  "val_ratio": 0.1,
+  "test_ratio": 0.2,
+  "use_custom_processing": true,
+  "custom_processing_steps": "利用其他列预测 LULL这一列，输入窗口长度为48，预测窗口长度为96.数据切分比例为8:1:1",
+  "input_length": 96,
+  "output_length": 24,
+  "time_increment": 1,
+  "normalization_policy": "auto",
+  "max_iterations": 3,
+  "approved_generated_codes": {}
+}

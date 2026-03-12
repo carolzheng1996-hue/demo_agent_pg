@@ -1,0 +1,14 @@
+{
+  "engineered_columns": [
+    "OT_lag_1",
+    "OT_lag_24",
+    "OT_rolling_mean_24",
+    "OT_rolling_std_24",
+    "hour",
+    "dayofweek"
+  ],
+  "shape": [
+    17420,
+    14
+  ]
+}

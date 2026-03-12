@@ -1,0 +1,44 @@
+{
+  "approved": false,
+  "proposal": {
+    "generated_code": "outputs = {}\ndf = raw_df.copy()\ndf['date'] = pd.to_datetime(df['date'], errors='coerce')\nfeature_cols = [\"HUFL\", \"HULL\", \"MUFL\", \"MULL\", \"LUFL\", \"LULL\"]\ntarget_col = 'OT'\nworking_df = df.copy()\nnumeric_candidates = feature_cols + [target_col]\nfor col in numeric_candidates:\n    if col in working_df.columns:\n        working_df[col] = pd.to_numeric(working_df[col], errors='coerce')\nworking_df = working_df.ffill().bfill()\nstandardized_df = working_df[feature_cols + [target_col]].copy() if feature_cols else working_df[[target_col]].copy()\nstandardized_df = standardized_df.fillna(0.0)\nstandardized_array = standardized_df.to_numpy(dtype=float)\noutputs[\"standardized_df\"] = standardized_df\noutputs[\"standardized_array\"] = standardized_array\noutputs[\"target_array\"] = standardized_df[target_col].to_numpy(dtype=float)\nn = len(standardized_df)\ntrain_end = int(n * train_ratio)\nval_end = train_end + int(n * val_ratio)\noutputs[\"split_index\"] = {\"train_end\": train_end, \"val_end\": val_end, \"test_end\": n}\n",
+    "requires_user_confirmation": true,
+    "approved": false
+  },
+  "dataset_profile": {
+    "dataset_path": "/Users/monychen/Documents/demo-zjl/data/ETTh1.csv",
+    "selected_file": "/Users/monychen/Documents/demo-zjl/data/ETTh1.csv",
+    "shape": [
+      17420,
+      8
+    ],
+    "columns": [
+      "date",
+      "HUFL",
+      "HULL",
+      "MUFL",
+      "MULL",
+      "LUFL",
+      "LULL",
+      "OT"
+    ],
+    "date_column": "date",
+    "target_column": "OT",
+    "feature_columns": [
+      "HUFL",
+      "HULL",
+      "MUFL",
+      "MULL",
+      "LUFL",
+      "LULL"
+    ],
+    "use_custom_processing": true,
+    "custom_processing_steps": "利用其他列预测 LULL这一列，输入窗口长度为48，预测窗口长度为96.数据切分比例为8:1:1",
+    "need_split": true,
+    "split_ratios": {
+      "train_ratio": 0.7,
+      "val_ratio": 0.1,
+      "test_ratio": 0.2
+    }
+  }
+}

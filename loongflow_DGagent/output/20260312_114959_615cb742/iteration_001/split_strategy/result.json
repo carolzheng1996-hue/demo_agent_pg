@@ -1,0 +1,28 @@
+{
+  "strategy": "time_order_split",
+  "rows": 17420,
+  "ratios": {
+    "train_ratio": 0.7,
+    "val_ratio": 0.1,
+    "test_ratio": 0.2
+  },
+  "window_config": {
+    "input_length": 96,
+    "output_length": 24,
+    "time_increment": 1
+  },
+  "indices": {
+    "train": [
+      0,
+      12194
+    ],
+    "val": [
+      12194,
+      13936
+    ],
+    "test": [
+      13936,
+      17420
+    ]
+  }
+}

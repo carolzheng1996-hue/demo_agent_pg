@@ -1,0 +1,24 @@
+{
+  "iterations_completed": 3,
+  "iteration_history": [
+    {
+      "iteration_index": 1,
+      "best_score": 2.1998566984588552,
+      "selected_strategy": "ensemble",
+      "report_path": "/Users/monychen/Documents/demo-zjl/loongflow_DGagent/output/20260312_103946_14e3acf3/iteration_001/summary.md"
+    },
+    {
+      "iteration_index": 2,
+      "best_score": 2.142552761698175,
+      "selected_strategy": "ensemble",
+      "report_path": "/Users/monychen/Documents/demo-zjl/loongflow_DGagent/output/20260312_103946_14e3acf3/iteration_002/summary.md"
+    },
+    {
+      "iteration_index": 3,
+      "best_score": 2.3988909658559243,
+      "selected_strategy": "ensemble",
+      "report_path": "/Users/monychen/Documents/demo-zjl/loongflow_DGagent/output/20260312_103946_14e3acf3/iteration_003/summary.md"
+    }
+  ],
+  "final_report_path": "/Users/monychen/Documents/demo-zjl/loongflow_DGagent/output/20260312_103946_14e3acf3/final_summary.md"
+}
