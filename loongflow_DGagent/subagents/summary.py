@@ -34,8 +34,10 @@ def run(state: DGGlobalState) -> Dict:
     iteration_index = int(state.read("current_iteration_index", 1))
     dataset_profile = state.read("dataset_profile", {})
     analysis_result = state.read("data_analysis_result", {})
+    data_formatter_result = state.read("data_formatter_result", {})
     feature_engineering_result = state.read("feature_engineering_result", {})
     split_strategy_result = state.read("split_strategy_result", {})
+    datanorm_result = state.read("datanorm_result", {})
     preprocess_result = state.read("preprocess_result", {})
     model_selection = state.read("model_selection_result", {})
     model_training = state.read("model_training_result", {})
@@ -55,11 +57,17 @@ def run(state: DGGlobalState) -> Dict:
         "## Analysis",
         json.dumps(analysis_result.get("base_analysis", {}), ensure_ascii=False, indent=2),
         "",
+        "## Data Formatter",
+        json.dumps(data_formatter_result, ensure_ascii=False, indent=2),
+        "",
         "## Feature Engineering",
         json.dumps(feature_engineering_result, ensure_ascii=False, indent=2),
         "",
         "## Split Strategy",
         json.dumps(split_strategy_result, ensure_ascii=False, indent=2),
+        "",
+        "## DataNorm",
+        json.dumps(datanorm_result, ensure_ascii=False, indent=2),
         "",
         "## Preprocess",
         json.dumps(preprocess_result, ensure_ascii=False, indent=2),

@@ -1,5 +1,6 @@
 from .analysis import compute_full_analysis, summarize_dataframe
 from .artifacts import ensure_task_context, prepare_iteration_artifacts, write_step_artifact, write_task_text_artifact
+from .codegen import infer_target_column_from_query, parse_target_columns, regenerate_code_with_feedback
 from .evaluation import compare_models_with_metrics, compute_metrics_extended, evaluate_iteration, mean_ensemble
 from .sandbox import execute_user_code_safely
 
@@ -10,6 +11,9 @@ __all__ = [
     "prepare_iteration_artifacts",
     "write_step_artifact",
     "write_task_text_artifact",
+    "infer_target_column_from_query",
+    "parse_target_columns",
+    "regenerate_code_with_feedback",
     "compare_models_with_metrics",
     "compute_metrics_extended",
     "evaluate_iteration",

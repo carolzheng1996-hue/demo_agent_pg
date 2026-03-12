@@ -14,12 +14,18 @@ except ImportError:
 class DGGlobalState:
     """Shared state for all DG agents, with persistent and runtime scopes."""
 
-    def __init__(self, persist_path: Path = STATE_FILE, initial: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        persist_path: Path = STATE_FILE,
+        initial: Optional[Dict[str, Any]] = None,
+        load_existing: bool = True,
+    ):
         self._persist_path = persist_path
         self._lock = threading.RLock()
         self._state: Dict[str, Any] = {}
         self._runtime: Dict[str, Any] = {}
-        self.load()
+        if load_existing:
+            self.load()
         if initial:
             self.update(initial)
 

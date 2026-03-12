@@ -16,7 +16,7 @@ except ImportError:
 def run(state: DGGlobalState) -> Dict:
     df = state.read_runtime("raw_df")
     if df is None:
-        raise RuntimeError("Missing raw dataframe in runtime state. Run approved data_reading first.")
+        raise RuntimeError("Missing raw dataframe in runtime state. Run data_reading first.")
 
     target_col = state.read("dataset_profile", {}).get("target_column")
     analysis = compute_full_analysis(df, target_col)

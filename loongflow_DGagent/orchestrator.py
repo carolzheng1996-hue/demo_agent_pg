@@ -51,9 +51,11 @@ class DGOrchestrator:
         if intent == "build_forecast_model":
             plan = [
                 "data_reading",
+                "data_formatter",
                 "data_analysis",
                 "feature_engineering",
                 "split_strategy",
+                "datanorm",
                 "preprocess",
                 "model_selection",
                 "model_training",
@@ -67,7 +69,7 @@ class DGOrchestrator:
                 "requires_split": True,
             }
         elif intent == "analysis_only":
-            plan = ["data_reading", "data_analysis", "feature_engineering", "summary"]
+            plan = ["data_reading", "data_formatter", "data_analysis", "feature_engineering", "summary"]
             meta = {
                 "task_type": "analysis_only",
                 "requires_modeling": False,
@@ -88,9 +90,11 @@ class DGOrchestrator:
     def _canonical_plan(raw_plan: List[str]) -> List[str]:
         canonical = [
             "data_reading",
+            "data_formatter",
             "data_analysis",
             "feature_engineering",
             "split_strategy",
+            "datanorm",
             "preprocess",
             "model_selection",
             "model_training",
@@ -106,13 +110,16 @@ class DGOrchestrator:
                 clean.append(name)
 
         if not clean:
-            clean = ["data_reading", "data_analysis", "feature_engineering", "summary"]
+            clean = ["data_reading", "data_formatter", "data_analysis", "feature_engineering", "summary"]
+
+        if "data_reading" in clean and "data_formatter" not in clean:
+            clean.append("data_formatter")
 
         if any(step in clean for step in ["model_selection", "model_training", "evaluator", "model_integration"]):
-            for required in ["data_reading", "data_analysis", "model_selection", "model_training", "model_integration"]:
+            for required in ["data_reading", "data_formatter", "data_analysis", "model_selection", "model_training", "model_integration"]:
                 if required not in clean:
                     clean.append(required)
-            for required in ["feature_engineering", "split_strategy", "preprocess", "evaluator"]:
+            for required in ["feature_engineering", "split_strategy", "datanorm", "preprocess", "evaluator"]:
                 if required not in clean:
                     clean.append(required)
 
@@ -134,8 +141,9 @@ class DGOrchestrator:
             system_prompt=(
                 "You are the main agent of a data analysis system. Understand the user task semantically and produce an execution plan. "
                 "Do not rely on keyword matching. Return JSON with keys: task_type, requires_modeling, requires_split, teams, subagents, reason. "
-                "Allowed subagents: data_reading, data_analysis, feature_engineering, split_strategy, preprocess, model_selection, model_training, evaluator, model_integration, summary. "
-                "If modeling is required, include split_strategy, preprocess, model_selection, model_training, evaluator, model_integration. summary must be last."
+                "Allowed subagents: data_reading, data_formatter, data_analysis, feature_engineering, split_strategy, datanorm, preprocess, model_selection, model_training, evaluator, model_integration, summary. "
+                "If any dataset needs to be processed, include data_reading and data_formatter before analysis/modeling. "
+                "If modeling is required, include split_strategy, datanorm, preprocess, model_selection, model_training, evaluator, model_integration. summary must be last."
             ),
             user_prompt=json.dumps(
                 {
@@ -172,7 +180,7 @@ class DGOrchestrator:
 
     @staticmethod
     def _pre_steps(plan: List[str]) -> List[str]:
-        return [step for step in plan if step in ["data_reading", "data_analysis", "feature_engineering", "split_strategy", "preprocess"]]
+        return [step for step in plan if step in ["data_reading", "data_formatter", "data_analysis", "feature_engineering", "split_strategy", "datanorm", "preprocess"]]
 
     @staticmethod
     def _iterative_steps(plan: List[str]) -> List[str]:
