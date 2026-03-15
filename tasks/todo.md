@@ -1,5 +1,140 @@
 # Todo
 
+## 2026-03-15 pipline iteration/切分/最终集成优化
+
+- [x] 为 `feature_engineering` 增加跨 iteration 的随机特征手段选择
+- [x] 将用户输入切分比例改为自动归一化，兼容 `8:2:1` 等非 1.0 写法
+- [x] 删除 state、后端列表与前端展示中未参与主链路的 `selected_file`
+- [x] 保存每个 iteration 的最优结果，并新增跨 iteration 最优结果集成输出
+- [x] 更新 todo review
+
+- `feature_engineering.py` 已改为使用 `SystemRandom` 选择特征手段，并显式避免与上一轮完全相同的组合。
+- `data_formatter.py` 与 `split_strategy.py` 已将用户输入比例统一归一化，只要求非负且总和大于 0。
+- `data_reading.py`、`webapp.py`、`web/app.js` 已移除 `selected_file` 的状态与展示依赖。
+- `evaluator.py` 会保存每轮最优模型/集成的摘要与预测，`orchestrator.py` 会在所有轮次结束后生成 `cross_iteration_ensemble.json`，并追加到 `final_summary.md`。
+- 前端详情页已新增“跨迭代最终集成”面板，用于展示最终集成的指标和参与轮次。
+- 未执行 Python 或前端服务验证；按仓库约定，需要你本地运行验证。
+
+## 2026-03-15 pipline SystemRandom 开关
+
+- [x] 为 CLI 和 Web 表单增加是否使用 `SystemRandom` 的入参
+- [x] 为 `feature_engineering` 增加可切换的随机/确定性策略选择
+- [x] 更新 todo review
+
+- `main.py` 已新增 `--use-system-random` / `--disable-system-random` 两个 CLI 开关。
+- `webapp.py` 与 Web 表单已新增 `use_system_random` 字段，并统一解析为布尔值。
+- `feature_engineering.py` 会根据该开关在 `SystemRandom` 和确定性种子策略之间切换，结果中会记录 `random_mode`。
+- 未执行 Python 或前端服务验证；按仓库约定，需要你本地运行验证。
+
+## 2026-03-15 pipline 模型参数去重与 LSTM 多输入训练
+
+- [x] 保证各模型在不同 iteration 中使用不同的参数组合
+- [x] 让 LSTM 支持基于 `engineered_df/preprocessed_df` 的多输入特征训练
+- [x] 补充前端结果展示中的参数与训练模式信息
+- [x] 更新 todo review
+
+- `model_selection.py` 已新增历史参数签名与去重逻辑，避免 `arima/xgboost/lstm` 在不同 iteration 使用重复参数。
+- `model_training.py` 与 `tools/model_tools.py` 已让 LSTM 支持多输入数值特征序列训练，不再局限于单目标序列。
+- LSTM 结果中新增 `training_mode`、`feature_columns`、`feature_count` 和 `fallback_error`，便于判断是否真的走了多输入 `torch` 训练。
+- 前端模型摘要已增加参数摘要、训练后端和训练模式展示。
+- 未执行 Python 或前端服务验证；按仓库约定，需要你本地运行验证。
+
+## 2026-03-15 pipline LSTM 快速测试设置
+
+- [x] 将 LSTM 默认训练轮数临时调整为 1
+- [x] 禁止 iteration 选参阶段再次抬高 LSTM 的 `epochs`
+
+- `config.py` 已将 LSTM 默认 `epochs` 调整为 `1`，用于快速测试。
+- `model_selection.py` 中 LSTM 的参数扰动仍然保留，但 `epochs` 会固定为 `1`，避免不同 iteration 因训练轮数增加导致耗时明显上升。
+- 未执行 Python 或前端服务验证；按仓库约定，需要你本地运行验证。
+
+## 2026-03-15 pipline 临时用 linear 替换 LSTM
+
+- [x] 将默认候选模型中的 `lstm` 暂时替换为 `linear`
+- [x] 新增快速 `linear` 训练实现并接入多输入特征场景
+- [x] 更新 todo review
+
+- `config.py` 已将默认允许模型改为 `arima/xgboost/linear`。
+- `model_selection.py` 已将第三个候选模型从 `lstm` 替换为 `linear`，并保留跨 iteration 参数去重。
+- `model_tools.py` 新增 `train_linear()`，优先使用多输入特征矩阵做快速线性拟合。
+- `model_training.py` 已改为调用 `linear`，不再默认触发 `torch` 训练。
+- 未执行 Python 或前端服务验证；按仓库约定，需要你本地运行验证。
+
+## 2026-03-15 pipline 无 LLM 时序预测项目
+
+- [x] 审查 `pipline` 目录现状与 `loongflow_DGagent` 的可复用边界
+- [x] 将 `pipline` 后端编排改为固定时序预测 pipeline，移除 LLM 计划生成与代码审批
+- [x] 将 `pipline` 子模块中的 LLM 调用替换为确定性规则和代码实现
+- [x] 调整 `pipline` 前端与文档，移除 LLM 相关交互并对齐新流程
+- [x] 检查改动结果并更新 todo review
+
+## 2026-03-15 pipline 统计/迭代/前端优化
+
+- [x] 增强统计特征展示，补充输入数据基础统计文本摘要
+- [x] 将特征工程扩展到输入特征列，而不只处理目标列
+- [x] 增强 iteration 多样性，避免各轮结果完全一致
+- [x] 优化前端轮询和渲染，避免运行过程中界面持续刷新
+- [x] 更新 todo review
+
+## 2026-03-15 pipline 标准化与多文件输入优化
+
+- [x] 支持用户选择是否标准化以及标准化方式（off/zscore/minmax）
+- [x] 增强目录多文件读取与多文件标准化处理
+- [x] 优化前端大量新增特征的滚动展示
+- [x] 更新 todo review
+
+- CLI 与 Web 表单已将标准化策略改为 `auto/off/zscore/minmax`，不再使用旧的强制开关枚举。
+- `data_reading` 已支持目录下多文件读取与拼接，并在结果中记录 `loaded_files` 和每个文件的形状。
+- `preprocess` 已支持 `zscore` 与 `minmax` 两种标准化；目录输入场景下会优先尝试增量拟合或 sklearn 缩放器。
+- 前端“新增特征列”已改为滚动文本框显示，避免大量特征名撑坏卡片布局。
+- README 和 Web API 文档已同步更新到新的标准化与多文件输入能力。
+- 未执行 Python 脚本或前端服务验证；按仓库约定，需要你本地运行验证。
+
+## 2026-03-15 pipline parquet 读取支持
+
+- [x] 为 `data_reading` 增加 `.parquet` 文件扫描与读取支持
+- [x] 同步更新 CLI 和 README 的支持格式说明
+
+- `pipline/subagents/data_reading.py` 已支持 `pd.read_parquet()`。
+- `pipline/main.py` 与 `pipline/README.md` 已同步更新为支持 `csv/pkl/npy/parquet`。
+- 未执行 Python 读取验证；按仓库约定，需要你本地运行验证。
+
+## 2026-03-15 pipline 指定输入列与时间列处理
+
+- [x] 支持用户显式指定预测输入列
+- [x] 在数据整理阶段按时间列排序并提取 date/hour/minute
+- [x] 同步更新 Web 表单、README 与任务记录
+
+- `main.py`、`webapp.py` 和前端表单已新增 `input_feature_cols` 参数入口。
+- `data_formatter.py` 已支持按用户指定列作为模型输入；若未指定，仍回退到原有自动推断逻辑。
+- 当检测到时间列时，数据会按时间排序，并自动提取 `date/hour/minute` 三个派生列进入特征链路。
+- 前端数据规范化摘要已展示用户输入列、时间派生列以及是否按时间排序。
+- 未执行 Python 或前端服务验证；按仓库约定，需要你本地运行验证。
+
+## 2026-03-15 pipline 移除自定义数据处理流程
+
+- [x] 删除 CLI 与 Web 表单中的自定义数据处理参数
+- [x] 删除后端状态字段与前端展示中的自定义数据处理逻辑
+- [x] 同步更新文档与任务记录
+
+- `main.py`、`webapp.py`、`web/index.html` 和 `web/app.js` 已移除 `use_custom_processing` / `custom_processing_steps`。
+- `data_formatter.py` 的数据集 profile 不再记录自定义处理字段。
+- Web API 文档已同步删除这两个请求字段。
+- 未执行 Python 或前端服务验证；按仓库约定，需要你本地运行验证。
+
+- `data_analysis` 已补充 `input_statistics_text`，前端会以只读文本框展示输入维度、缺失值和数值列均值。
+- `feature_engineering` 已从只处理目标列改为同时处理输入数值列与目标列，并在结果中记录 `source_columns`。
+- `model_training` 与 `tools/model_tools.py` 已让 `xgboost` 使用扩展后的输入特征矩阵参与训练；训练结果中新增建模特征数量。
+- `model_selection` 和 `feature_engineering` 已引入基于历史轮次的策略扰动，避免每个 iteration 选择完全一样的参数和特征手段。
+- 前端状态卡不再因为轮询时间戳变化而持续重绘；统计区新增基础统计文本卡片。
+- 未执行 Python 脚本或前端服务验证；按仓库约定，需要你本地运行验证。
+
+- 已在 `pipline/` 下保留原有前后端骨架，但将 orchestrator、data_formatter、split_strategy、data_analysis、datanorm、model_selection、summary 等模块改为纯规则/纯代码驱动。
+- 已删除 `pipline` 中未再使用的 LLM 辅助文件，并重写 README 与 Web API 文档为无 LLM 口径。
+- 前端已移除代码审批与反馈修改交互，保留任务提交、统计分析结果与模型迭代结果展示。
+- 通过全文检索确认 `pipline` 主流程已不再引用 `llm_utils`、`approve_generated_code`、`awaiting_user_confirmation` 等字段。
+- 未执行 Python 脚本或 Web 服务验证；按仓库约定，需要你本地运行验证命令。
+
 - [x] 按指定结构创建根模块与目录
 - [x] 实现 GlobalState 共享状态总线（含 JSON 持久化）
 - [x] 实现 TaskManager（任务追踪 + JSON 持久化）
@@ -218,6 +353,16 @@
 - 已新增 `loongflow_DGagent/web/` 静态前端，支持参数填写、任务提交、运行状态轮询、审批提示，以及按 `task -> iteration -> subagent` 展示工件结果。
 - 页面展示数据直接从 `loongflow_DGagent/output/` 目录回放，不引入额外数据库，后续扩展下载工件或在线审批时改动面较小。
 - 已新增 `run_loongflow_dgagent_web.py` 作为仓库根目录启动入口。
+
+## 2026-03-15 pipline 无 LLM 时序预测项目
+
+- [x] 审查 `loongflow_DGagent` 的 LLM 依赖点、前后端入口和可复用模块
+- [ ] 创建新的 `pipline/` 项目目录，保持前端、后端和工件结构独立
+- [ ] 移除 `pipline/` 中的 LLM 依赖模块与审批式代码生成链路
+- [ ] 将 orchestrator 改为纯规则驱动的时序预测 pipeline 编排
+- [ ] 将关键 subagent 改为预定义代码流程，完成数据读取、格式化、特征、切分、训练、集成、评估、总结
+- [ ] 调整 `pipline` 前端默认文案、接口说明和 README，明确其为无 LLM 版本
+- [ ] 完成静态核对并更新 todo review
 - 已执行 `git diff --check` 静态检查，未发现格式错误。
 - 未执行 Python 级运行验证；遵循仓库约定，需要你本地启动 `python loongflow_DGagent/webapp.py --host 127.0.0.1 --port 8000` 或 `python run_loongflow_dgagent_web.py` 进行实际联调。
 ## 2026-03-11 loongflow_DGagent 前端优化
@@ -258,6 +403,131 @@
 - [x] 将历史任务按日期分组展示
 - [x] 调整任务项样式为聊天侧栏风格
 - [x] 复查差异并执行静态检查
+
+## 2026-03-13 loongflow_DGagent 代码工件持久化与特征工程增强
+- [x] 审查 `data_formatter/split_strategy/feature_engineering` 当前代码生成与执行链路
+- [x] 新增统一代码 artifact 持久化能力，保存每阶段生成/审批/执行的代码文件
+- [x] 调整恢复执行逻辑，优先读取已保存代码工件而非仅依赖内存 state
+- [x] 扩展 `feature_engineering`，增加多种 tsfresh 风格时序特征策略
+- [x] 将不同 iteration 的特征工程策略改为可控随机/轮换，显式拉开差异
+- [x] 复查前后端任务详情读取结果，并补充 todo review 与未验证项
+
+- 已为 `loongflow_DGagent/tools/artifacts.py` 增加统一代码工件读写能力，当前会把生成代码和最终执行代码分别落到各 step 目录下。
+- `data_formatter` 与 `split_strategy` 现在会优先从 `generated_code.py/executed_code.py` 恢复代码，再回退到 state 中的审批缓存；前端或 CLI 修改后的代码也会同步写回 artifact。
+- `data_analysis` 的 `llm_generated_code` 也会保存为独立代码文件，运行结束后仍可从 `output/<task-id>/<iteration-id>/<step>/` 直接复用。
+- `feature_engineering` 已扩展为多种 tsfresh 风格策略池：lag、rolling、difference、ewm、peak、calendar，并把每轮选中的方法写入结果工件。
+- `orchestrator` 已调整为建模任务每轮重新执行 `feature_engineering + preprocess + model_selection + model_training + model_integration + evaluator + summary`，从而让不同 iteration 真实产生不同特征策略。
+- `model_selection` 的 fallback 选择已读取本轮特征策略，进一步拉开各 iteration 的模型参数差异。
+- 已执行 `git diff --check`，未发现格式错误。
+- 未执行 Python 级运行验证；遵循仓库约定，需要你本地启动 `loongflow_DGagent` 建模任务，确认产物目录中已出现 `generated_code.py/executed_code.py`，且多轮 `feature_engineering/result.json` 的 `selected_methods` 存在差异。
+
+## 2026-03-13 loongflow_DGagent LLM API 诊断脚本
+- [x] 审查 `loongflow_DGagent` 当前 LLM 调用链与 fallback 触发点
+- [x] 新增独立 LLM API 探测脚本，覆盖 env、直连调用、文本调用、JSON 调用
+- [x] 在 todo review 中记录使用方式与未执行验证项
+
+- 已确认 `loongflow_DGagent/llm_utils.py` 在 `invoke_text/invoke_json` 中会吞掉所有异常并返回 `None`，这会直接触发各 subagent 的 fallback，因此前端若持续出现兜底代码，首先应验证底层 `get_llm().invoke()` 是否真的成功。
+- 已新增 `loongflow_DGagent/llm_api_probe.py`，会依次输出 env 识别结果、`get_llm().invoke()` 直连结果、`invoke_text()` 结果和 `invoke_json()` 结果，便于快速定位是配置问题、底层请求失败，还是 JSON 解析失败。
+- 未执行 Python 级验证；遵循仓库约定，需要你本地运行 `cd loongflow_DGagent && python llm_api_probe.py`，并把输出贴给我，我可以继续据此定位为什么前端一直走 fallback。
+
+## 2026-03-13 loongflow_DGagent data_formatter 通用性修正
+- [x] 审查 `data_formatter/file_tools/web` 中 ETTh1/OT 假设与 fallback 执行方式
+- [x] 修正目标列自动选择逻辑，去除对 `OT` 的硬编码依赖
+- [x] 为 fallback 与生成代码补充可复用 import，并增强多文件场景 prompt
+- [x] 更新相关文案与 review，说明未执行的 Python 验证
+
+- 已修正 `loongflow_DGagent/subagents/data_formatter.py` 的目标列选择，不再把 `OT` 作为默认偏好列；改为先用显式 `--target-col` / query 命中，再走通用数值列启发式。
+- 已修正 `loongflow_DGagent/tools/file_tools.py` 的 `set_target()`，优先匹配常见目标列语义（`target/label/value/sales/load/price/...`），否则回退到非日期数值列的最后一列，而非硬编码 ETTh1 风格列名。
+- 已为 `data_formatter` 的 fallback 代码补充 `import numpy as np` 和 `import pandas as pd`，这样保存下来的代码文件本身也可复用；此前虽然在沙箱里能执行，是因为 `execute_user_code_safely()` 会注入 `pd/np`。
+- 已增强 `data_formatter` 的代码生成 prompt，加入 `supported_files/selected_file/is_directory_input` 等上下文，并明确要求处理多文件目录输入、通用时序场景、缺失值和 datetime 列，而不是仅适配 ETTh1。
+- 已同步更新前端 target 列占位文案与 README 示例，去掉 `OT` 这类容易误导为内置默认列的提示。
+- 已执行 `git diff --check`，未发现格式错误。
+- 未执行 Python 级验证；遵循仓库约定，需要你本地重新运行 `loongflow_DGagent`，重点检查非 ETTh1 数据集下 `data_formatter` 生成代码的目标列是否正确、以及保存的 fallback/generated 代码文件是否能直接复用。
+
+## 2026-03-13 loongflow_DGagent 全项目通用性与多文件一致性检查
+- [x] 梳理 `loongflow_DGagent` 中与数据集路径、目标列、文件列表、前后端展示相关的实现与硬编码假设
+- [x] 修正后端 subagents/tools/orchestrator 中的单文件或特定列名假设，补齐多文件上下文传递
+- [x] 修正前端与 API 合同文档中的文案和字段使用，确保与后端一致
+- [x] 更新 `tasks/todo.md` 与 `tasks/lessons.md`，补充 review 和本地验证建议
+
+- 已继续检查 `loongflow_DGagent` 整体代码，重点覆盖 CLI、webapp、前端任务列表/详情、API contract、README 和 `data_formatter/file_tools`。
+- 后端现在会在 `dataset_profile` 与任务列表里统一暴露 `is_directory`、`supported_files`、`available_file_count`、`selected_file`、`target_columns`，前端已同步消费这些字段，避免“后端支持多文件、前端仍按单文件显示”的割裂。
+- `web/app.js` 已调整任务卡片和统计摘要，支持展示目录输入、发现文件数、多目标列以及每轮特征策略；搜索也已纳入 `selected_file/target_columns/is_directory`。
+- `webapp.py` 的默认表单值已去掉 ETTh1 专属 query/dataset_name 表述；`main.py` 的 `--dataset-path` 帮助文案也改为“文件或目录路径，支持 csv/pkl/npy”。
+- `README.md` 与 `WEB_API_AND_UI_CONTRACT.md` 已同步更新为“单文件或目录输入”的口径，并补充多文件相关字段说明。
+- 已更新 `tasks/lessons.md`：后续凡是涉及数据集路径、目标列和前端文案，都必须默认按多文件和通用列名场景检查，不再把样例数据当默认规则。
+- 已执行 `git diff --check`，未发现格式错误。
+- 未执行 Python 级验证；遵循仓库约定，需要你本地分别验证：
+- 1. 传入单个文件路径时前后端显示是否正常。
+- 2. 传入包含多个 `csv/pkl/npy` 的目录时，前端是否正确显示“目录输入/文件数/已选文件”。
+- 3. 非 ETTh1 数据集下，目标列自动推断和 `target_col` 显式指定是否都正常。
+
+## 2026-03-13 loongflow_DGagent 生成代码执行自修复
+- [x] 修复沙箱 `__import__` 被禁用导致的 import 失败
+- [x] 为生成代码执行增加基于报错的自动修复与重试机制
+- [x] 将修复尝试和失败原因写入 step artifact，便于前端排障
+- [x] 更新 review，明确“不自动装包”的边界与验证建议
+
+- 已修复 `loongflow_DGagent/tools/sandbox.py`：当前允许受控导入 `numpy/pandas/json/math/statistics/collections`，因此生成代码中的 `import pandas as pd`、`import numpy as np` 不会再因为缺少 `__import__` 直接失败。
+- 已新增 `execute_user_code_with_repair()`：当 `data_formatter` 或 `split_strategy` 的生成代码运行失败时，会基于运行时报错自动请求 LLM 重写代码并重试；若仍失败，再回退到本地 fallback。
+- 当前不会自动安装 Python 包。这里遵守仓库约束，只做“受控 import + 自动重写修复”；如果模型生成了依赖额外三方库的代码，会被自动要求改写为仅使用 pandas/numpy/基础标准库。
+- `data_formatter` 和 `split_strategy` 已把 `execution_diagnostics` 写入结果工件，前端结果区会直接显示 `code_source`、`generated_code_error`、`repair_attempts` 等字段，便于定位为什么触发了 fallback。
+- `tools/codegen.py` 的 fallback 模板也补上了 import，避免“保存出来的代码不能单独复用”。
+- 已执行 `git diff --check`，未发现格式错误。
+- 未执行 Python 级验证；遵循仓库约定，需要你本地重新运行前端任务，重点确认：
+- 1. `__import__ not found` 不再出现。
+- 2. 当生成代码首次失败时，`result.json` 中能看到 `execution_diagnostics.repair_attempts`。
+- 3. 若最终仍走 fallback，前端能直接看到 `generated_code_error`，而不是只表现为静默失败。
+
+## 2026-03-13 loongflow_DGagent LLM 自主校验与修复增强
+- [x] 将“输出不符合契约”的情况也纳入 LLM 自动修复闭环
+- [x] 为 `data_formatter` 与 `split_strategy` 增加结构化 validator
+- [x] 将 validator 失败原因写入 `repair_attempts`，便于前端查看
+- [x] 更新 review，说明当前自修复覆盖范围
+
+- 已将 `execute_user_code_with_repair()` 扩展为支持 `validator` 回调：现在不仅运行时报错会触发 LLM 重写，输出结构不符合契约时也会触发同一套修复流程。
+- `data_formatter` 已新增 `_validate_formatter_contract()`，会检查 `standardized_df/standardized_array/target_array` 是否真实产出；缺任一项都会先交给 LLM 重写修复，而不是直接在后续阶段报错。
+- `split_strategy` 已新增 `_validate_split_contract()`，会检查 `outputs['indices']` 以及 `train/val/test` 三段区间结构；像“代码执行成功但没生成 indices”这类错误现在会先进入 LLM 自修复，再决定是否 fallback。
+- `repair_attempts` 中记录的错误现在同时覆盖“运行异常”和“契约校验失败”，前端结果区可直接看到这些信息。
+- 当前 LLM 自修复覆盖范围：`data_formatter` 与 `split_strategy` 的运行期错误、缺少关键输出、输出结构不符合约定。还未扩展到全部 subagent。
+- 已执行 `git diff --check`，未发现格式错误。
+- 未执行 Python 级验证；遵循仓库约定，需要你本地重新运行触发过报错的任务，确认：
+- 1. `split_strategy` 缺少 `indices` 时不再直接中断。
+- 2. `execution_diagnostics.repair_attempts` 中能看到 validator 触发的报错信息。
+- 3. 若 LLM 修复后成功，`code_source` 仍为 `generated`，但 `used_repair=true`。
+
+- 已继续扩展前端摘要：`data_formatter` 与 `split_strategy` 的统计卡片现在会直接展示 `代码来源 / 自动修复 / 修复次数`，不用进入原始 JSON 也能快速判断本轮是否触发了 LLM 自修复。
+- 目前“可执行的 LLM 代码”只存在于 `data_formatter` 与 `split_strategy`，因此这两处已完全接入统一修复链路；`data_analysis` 目前只保存展示型代码，不参与执行，暂不需要同样的 validator。
+
+## 2026-03-13 loongflow_DGagent 前端轮询体验与必填提示优化
+- [x] 减少运行中轮询导致的界面重复重绘
+- [x] 为前端表单必填项增加统一红色星号提示
+- [x] 补充 review 与静态检查结果
+
+- 已在 `web/app.js` 中为运行态增加签名缓存：只有 job 状态卡内容变化时才更新状态面板，只有 task detail 内容变化时才重绘详情区，避免轮询时反复刷新整块界面。
+- 已减少运行中不必要的侧栏重绘：只有活跃任务 ID 发生变化时才重绘任务列表；同一任务轮询过程中不会每 1.5 秒重复刷新侧栏。
+- 已在 `web/index.html` 为当前真实必填字段 `任务描述` 和 `数据集路径` 增加统一红色星号，并在表单提示区补充“`*` 表示必填字段”说明。
+- 已在 `web/styles.css` 新增 `required-mark` 样式，以及状态卡轻量更新过渡样式，避免轮询时出现明显闪烁。
+- 已执行 `git diff --check`，未发现格式错误。
+- 未执行浏览器联调；遵循仓库约定，需要你本地启动前端后验证：
+- 1. 任务运行中状态卡与详情区不再持续闪烁。
+- 2. 必填项红色星号显示正常。
+- 3. 轮询完成、失败和审批暂停三种状态下界面仍能正确更新。
+
+## 2026-03-13 loongflow_DGagent 最终代码工件收敛
+- [x] 移除 `generated_code.py` 等中间代码文件落盘，仅保留最终执行代码
+- [x] 前端明确展示最终执行代码是 LLM 生成代码还是兜底代码
+- [x] 更新 contract 与 review，说明 proposal 与最终工件的区别
+
+- 现在目录中只保留最终真正运行的代码文件 `executed_code.py`；待审批或修改中的代码只保留在 `result.json -> proposal.generated_code`，不再额外落中间代码文件，避免用户误以为两份代码都会被执行。
+- `data_analysis` 的展示型 `llm_generated_code.py` 也已移除，因为它不参与执行，不应混入“最终执行代码工件”语义。
+- 前端摘要已把 `代码来源` 改成 `最终执行代码`，并显式展示为 `LLM 生成代码` 或 `兜底代码`，降低误解风险。
+- 工具层 `write_step_code_artifact/read_step_code_artifact` 的默认文件名也已改为 `executed_code.py`，避免后续新增逻辑时再次误写回 `generated_code.py`。
+- 已执行 `git diff --check`，未发现格式错误。
+- 未执行 Python/前端联调；遵循仓库约定，需要你本地重新运行后确认：
+- 1. step 目录中只剩 `executed_code.py`。
+- 2. 待审批阶段前端仍能正常展示 proposal 代码。
+- 3. 执行完成后前端“最终执行代码”字段能正确显示 `LLM 生成代码` 或 `兜底代码`。
 
 - 已为左侧任务栏增加搜索框，可按任务 ID、数据集路径、目标列和状态过滤。
 - 已将任务列表按 `Today / Yesterday / YYYY-MM-DD` 分组，呈现更接近聊天产品的历史会话侧栏。

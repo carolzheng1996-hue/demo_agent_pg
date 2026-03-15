@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>deterministic forecasting pipeline</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <div>
+            <p class="eyebrow">pipeline</p>
+            <h1>deterministic forecasting pipeline</h1>
+          </div>
+          <button id="refreshTasksButton" class="ghost-button" type="button">刷新</button>
+        </div>
+        <div class="sidebar-search">
+          <input id="taskSearchInput" type="search" placeholder="搜索任务 ID、数据集或目标列" />
+        </div>
+        <div id="taskList" class="task-list empty-state">暂无任务记录。</div>
+      </aside>
+
+      <main class="main-shell">
+        <section class="top-grid">
+          <section class="panel panel-form">
+            <div class="panel-head">
+              <h2>任务参数</h2>
+              <button id="loadDefaultsButton" class="ghost-button" type="button">恢复默认值</button>
+            </div>
+
+            <!--
+              Main task submission form.
+              Field ids intentionally match backend payload keys so `app.js`
+              can serialize the form into one request object with minimal mapping.
+            -->
+            <form id="jobForm" class="job-form">
+              <label>
+                <span>任务描述 <span class="required-mark">*</span></span>
+                <textarea id="query" name="query" rows="3" required></textarea>
+              </label>
+
+              <label>
+                <span>数据集路径 <span class="required-mark">*</span></span>
+                <input id="dataset_path" name="dataset_path" type="text" required />
+              </label>
+
+              <label>
+                <span>数据集名称</span>
+                <input id="dataset_name" name="dataset_name" type="text" />
+              </label>
+
+              <label>
+                <span>目标列</span>
+                <input id="target_col" name="target_col" type="text" placeholder="单列如 target；多列如 target,label" />
+              </label>
+
+              <label>
+                <span>输入列</span>
+                <input id="input_feature_cols" name="input_feature_cols" type="text" placeholder="例如 TEMP,WS,WD,PREC" />
+              </label>
+
+              <div class="ratio-grid">
+                <label>
+                  <span>Train Ratio</span>
+                  <input id="train_ratio" name="train_ratio" type="number" step="0.01" min="0" />
+                </label>
+                <label>
+                  <span>Val Ratio</span>
+                  <input id="val_ratio" name="val_ratio" type="number" step="0.01" min="0" />
+                </label>
+                <label>
+                  <span>Test Ratio</span>
+                  <input id="test_ratio" name="test_ratio" type="number" step="0.01" min="0" />
+                </label>
+                <label>
+                  <span>最大迭代轮数</span>
+                  <input id="max_iterations" name="max_iterations" type="number" step="1" min="1" max="10" />
+                </label>
+                <label>
+                  <span>Input Length</span>
+                  <input id="input_length" name="input_length" type="number" step="1" min="1" />
+                </label>
+                <label>
+                  <span>Output Length</span>
+                  <input id="output_length" name="output_length" type="number" step="1" min="1" />
+                </label>
+                <label>
+                  <span>Time Increment</span>
+                  <input id="time_increment" name="time_increment" type="number" step="1" min="1" />
+                </label>
+                <label>
+                  <span>Normalization</span>
+                  <select id="normalization_policy" name="normalization_policy">
+                    <option value="auto">Auto</option>
+                    <option value="off">Off</option>
+                    <option value="zscore">Z-Score</option>
+                    <option value="minmax">Min-Max</option>
+                  </select>
+                </label>
+                <label>
+                  <span>SystemRandom</span>
+                  <select id="use_system_random" name="use_system_random">
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="form-actions">
+                <button id="submitButton" class="primary-button" type="submit">提交任务</button>
+                <p id="formHint" class="muted-text">
+                  <span class="required-mark">*</span> 表示必填字段。
+                </p>
+              </div>
+            </form>
+          </section>
+
+          <section class="panel panel-status">
+            <div class="panel-head">
+              <h2>当前任务</h2>
+              <span id="jobStatusPill" class="status-pill idle">Idle</span>
+            </div>
+
+            <div id="jobStatusCard" class="status-card empty-state">
+              提交任务后，这里会显示运行状态、计划和错误信息。
+            </div>
+          </section>
+        </section>
+
+        <!--
+          Task detail panel is filled entirely by JavaScript after the user selects
+          a task from the sidebar or after a running job completes.
+        -->
+        <section class="panel panel-detail">
+          <div class="panel-head">
+            <h2>任务详情</h2>
+            <span id="taskDetailMeta" class="muted-text">未选择任务，选中后显示任务 ID、状态和轮次</span>
+          </div>
+          <div id="taskDetail" class="task-detail empty-state">尚未选择任务。</div>
+        </section>
+      </main>
+    </div>
+
+    <!--
+      Reusable template for generic step rendering.
+      More specialized cards in `app.js` compose richer summaries on top of this.
+    -->
+    <template id="stepTemplate">
+      <article class="step-card">
+        <div class="step-card-head">
+          <h4 class="step-title"></h4>
+          <span class="step-file-count"></span>
+        </div>
+        <div class="step-body"></div>
+      </article>
+    </template>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>
