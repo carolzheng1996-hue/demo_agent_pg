@@ -114,16 +114,26 @@
 
               <div class="ratio-grid">
                 <label>
+                  <span>是否启用特征工程</span>
+                  <select id="enable_feature_engineering" name="enable_feature_engineering">
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                  </select>
+                </label>
+                <label>
+                  <span>是否切分</span>
+                  <select id="enable_split" name="enable_split">
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                  </select>
+                </label>
+                <label>
                   <span>Train Ratio</span>
                   <input id="train_ratio" name="train_ratio" type="number" step="0.01" min="0" />
                 </label>
                 <label>
                   <span>Val Ratio</span>
                   <input id="val_ratio" name="val_ratio" type="number" step="0.01" min="0" />
-                </label>
-                <label>
-                  <span>Test Ratio</span>
-                  <input id="test_ratio" name="test_ratio" type="number" step="0.01" min="0" />
                 </label>
                 <label>
                   <span>Split Method</span>
@@ -144,13 +154,6 @@
                   <input id="split_test_units" name="split_test_units" type="text" placeholder="B001,B002" />
                 </label>
                 <label>
-                  <span>Skip Split</span>
-                  <select id="skip_split" name="skip_split">
-                    <option value="false">关闭</option>
-                    <option value="true">开启</option>
-                  </select>
-                </label>
-                <label>
                   <span>最大迭代轮数</span>
                   <input id="max_iterations" name="max_iterations" type="number" step="1" min="1" max="10" />
                 </label>
@@ -167,8 +170,11 @@
                   <input id="points_per_day" name="points_per_day" type="number" step="1" min="1" />
                 </label>
                 <label>
-                  <span>Time Increment</span>
-                  <input id="time_increment" name="time_increment" type="number" step="1" min="1" />
+                  <span>是否标准化</span>
+                  <select id="enable_normalization" name="enable_normalization">
+                    <option value="true">开启</option>
+                    <option value="false">关闭</option>
+                  </select>
                 </label>
                 <label>
                   <span>Normalization</span>

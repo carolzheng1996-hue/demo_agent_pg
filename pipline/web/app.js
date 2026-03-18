@@ -63,7 +63,7 @@ function bindEvents() {
   elements.loadDefaultsButton.addEventListener("click", () => fillForm(state.defaults));
   elements.refreshTasksButton.addEventListener("click", refreshTasks);
   elements.taskSearchInput.addEventListener("input", onTaskSearch);
-  ["query", "start_stage", "end_stage", "split_method", "skip_split"].forEach((id) => {
+  ["query", "start_stage", "end_stage", "split_method", "enable_split", "enable_feature_engineering", "enable_normalization"].forEach((id) => {
     document.getElementById(id)?.addEventListener("input", syncFormVisibility);
     document.getElementById(id)?.addEventListener("change", syncFormVisibility);
   });
@@ -152,24 +152,28 @@ function syncFormVisibility() {
   const startStage = document.getElementById("start_stage")?.value || "data_reading";
   const endStage = document.getElementById("end_stage")?.value || "summary";
   const splitMethod = document.getElementById("split_method")?.value || "global_last_k";
-  const skipSplit = (document.getElementById("skip_split")?.value || "false") === "true";
+  const enableSplit = (document.getElementById("enable_split")?.value || "true") === "true";
+  const enableFeatureEngineering = (document.getElementById("enable_feature_engineering")?.value || "true") === "true";
+  const enableNormalization = (document.getElementById("enable_normalization")?.value || "true") === "true";
   const intent = inferIntent(query);
   const activeStages = stageRange(startStage, endStage);
-  const includesSplit = activeStages.includes("split_strategy") && !skipSplit;
-  const includesFeature = activeStages.includes("feature_engineering");
+  const includesSplit = activeStages.includes("split_strategy") && enableSplit;
+  const includesFeature = activeStages.includes("feature_engineering") && enableFeatureEngineering;
   const includesDsCleanup = activeStages.includes("data_reading") || activeStages.includes("data_formatter");
   const includesModel = activeStages.some((stage) => MODEL_STAGES.has(stage)) || (intent === "forecast_modeling" && endStage === "summary");
 
+  toggleField("enable_feature_engineering", activeStages.includes("feature_engineering") || activeStages.includes("preprocess") || includesModel);
   toggleField("formatter_unit", startStage === "data_formatter");
   toggleField("train_ratio", includesSplit);
   toggleField("val_ratio", includesSplit);
-  toggleField("test_ratio", includesSplit);
   toggleField("split_method", includesSplit);
   toggleField("split_cutoff_date", includesSplit && splitMethod === "fixed_date");
   toggleField("split_test_units", includesSplit && splitMethod === "leave_stations_out");
-  toggleField("skip_split", activeStages.includes("split_strategy") || includesModel);
+  toggleField("enable_split", activeStages.includes("split_strategy") || includesModel);
   toggleField("max_iterations", includesModel);
   toggleField("points_per_day", includesDsCleanup);
+  toggleField("enable_normalization", activeStages.includes("datanorm") || activeStages.includes("preprocess") || includesModel);
+  toggleField("normalization_policy", enableNormalization && (activeStages.includes("datanorm") || activeStages.includes("preprocess") || includesModel));
   toggleField("use_system_random", includesFeature);
 }
 
@@ -416,7 +420,9 @@ function renderSummaryOnlyStats(detail) {
     { label: "站点", value: (profile.selected_units || []).join(", ") || "—" },
     { label: "起始阶段", value: profile.start_stage || detail.plan?.plan_meta?.start_stage || "—" },
     { label: "结束阶段", value: profile.end_stage || detail.plan?.plan_meta?.end_stage || "—" },
-    { label: "是否跳过切分", value: formatBooleanDisplay(profile.skip_split) },
+    { label: "是否启用特征工程", value: formatBooleanDisplay(profile.enable_feature_engineering) },
+    { label: "是否启用切分", value: formatBooleanDisplay(profile.enable_split) },
+    { label: "是否启用标准化", value: formatBooleanDisplay(profile.enable_normalization) },
   ]);
   wrapper.appendChild(renderSummarySection(overview));
 
@@ -633,10 +639,9 @@ function summarizeSplitStrategy(splitResult) {
   const ratios = splitResult.ratios || {};
   return [
     { label: "切分策略", value: splitResult.strategy || "—" },
-    { label: "训练/验证/测试比例", value: Object.keys(ratios).length ? `${ratios.train_ratio} / ${ratios.val_ratio} / ${ratios.test_ratio}` : "—" },
+    { label: "训练/验证比例", value: Object.keys(ratios).length ? `${ratios.train_ratio} / ${ratios.val_ratio}` : "—" },
     { label: "输入长度", value: splitResult.window_config?.input_length },
     { label: "输出长度", value: splitResult.window_config?.output_length },
-    { label: "滑窗步长", value: splitResult.window_config?.time_increment },
     { label: "处理来源", value: splitResult.pipeline_source || "deterministic_splitter" },
   ].filter((item) => item.value !== undefined);
 }

@@ -34,19 +34,16 @@ def run(state: DGGlobalState) -> Dict:
     frames = _load_split_frames(state)
     train_df = frames["train"].reset_index(drop=True)
     val_df = frames.get("val", train_df.iloc[0:0].copy()).reset_index(drop=True)
-    test_df = frames.get("test", train_df.iloc[0:0].copy()).reset_index(drop=True)
     if any(target_col not in frame.columns for frame in frames.values()):
         raise ValueError(f"Target column {target_col} not found in preprocessed splits.")
 
     train = pd.to_numeric(train_df[target_col], errors="coerce").to_numpy(dtype=float)
     val = pd.to_numeric(val_df[target_col], errors="coerce").to_numpy(dtype=float)
-    test = pd.to_numeric(test_df[target_col], errors="coerce").to_numpy(dtype=float)
-    train_plus_val = np.concatenate([train, val]) if len(val) else train
-    split_applied = len(test) > 0
+    split_applied = len(val) > 0
 
-    train_frame = pd.concat([train_df, val_df], axis=0, ignore_index=True).select_dtypes(include=["number"]).copy()
-    test_frame = test_df.select_dtypes(include=["number"]).copy()
-    for frame in (train_frame, test_frame):
+    train_frame = train_df.select_dtypes(include=["number"]).copy()
+    val_frame = val_df.select_dtypes(include=["number"]).copy()
+    for frame in (train_frame, val_frame):
         if "__row_id__" in frame.columns:
             frame.drop(columns=["__row_id__"], inplace=True)
 
@@ -72,11 +69,11 @@ def run(state: DGGlobalState) -> Dict:
             results.append(output)
             continue
         if name == "arima":
-            output = train_arima(train_plus_val, test, order=tuple(params.get("order", [2, 1, 2])))
+            output = train_arima(train, val, order=tuple(params.get("order", [2, 1, 2])))
         elif name == "xgboost":
             output = train_xgboost(
-                train_plus_val,
-                test,
+                train,
+                val,
                 window=int(params.get("window", 48)),
                 n_estimators=int(params.get("n_estimators", 200)),
                 max_depth=int(params.get("max_depth", 6)),
@@ -86,23 +83,23 @@ def run(state: DGGlobalState) -> Dict:
                 random_seed=int(params.get("random_seed", 42)),
                 feature_methods=feature_methods,
                 train_frame=train_frame,
-                test_frame=test_frame,
+                test_frame=val_frame,
                 target_col=target_col,
             )
         elif name == "linear":
             output = train_linear(
-                train_plus_val,
-                test,
+                train,
+                val,
                 window=int(params.get("window", 96)),
                 fit_intercept=bool(params.get("fit_intercept", True)),
                 train_frame=train_frame,
-                test_frame=test_frame,
+                test_frame=val_frame,
                 target_col=target_col,
             )
         else:
             continue
         preds = np.asarray(output["predictions"], dtype=float)
-        output["metrics"] = compute_metrics_extended(test, preds)
+        output["metrics"] = compute_metrics_extended(val, preds)
         results.append(output)
 
     ranking = compare_models_with_metrics(results)
@@ -117,10 +114,9 @@ def run(state: DGGlobalState) -> Dict:
         "split_counts": {
             "train": int(len(train_df)),
             "val": int(len(val_df)),
-            "test": int(len(test_df)),
         },
     }
-    state.write_runtime("test_target", test)
+    state.write_runtime("validation_target", val)
     state.write("model_training_result", payload)
     write_step_artifact(state, "model_training", payload)
     return {

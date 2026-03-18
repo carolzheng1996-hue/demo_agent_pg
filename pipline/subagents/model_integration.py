@@ -18,11 +18,11 @@ def run(state: DGGlobalState) -> Dict:
     if not model_results:
         raise RuntimeError("No model results available. Run model_training first.")
 
-    test_target = state.read_runtime("test_target")
-    if test_target is None:
-        raise RuntimeError("Missing test target in runtime state.")
+    validation_target = state.read_runtime("validation_target")
+    if validation_target is None:
+        raise RuntimeError("Missing validation target in runtime state.")
 
-    ensemble_result = mean_ensemble(model_results, np.asarray(test_target, dtype=float))
+    ensemble_result = mean_ensemble(model_results, np.asarray(validation_target, dtype=float))
     state.write("model_integration_result", ensemble_result)
     write_step_artifact(state, "model_integration", ensemble_result)
     return {

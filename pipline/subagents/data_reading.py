@@ -123,11 +123,10 @@ def run(state: DGGlobalState) -> Dict:
     ds_df["timestamp_win"] = pd.to_datetime(ds_df["timestamp_win"], errors="coerce")
     ds_df = ds_df.sort_values(["station", "timestamp_win"]).reset_index(drop=True)
 
-    ods_path = write_task_dataframe_artifact(state, "data/data_reading_ods_dataset.parquet", ods_df)
     ds_path = write_task_dataframe_artifact(state, "data/data_reading_ds_dataset.parquet", ds_df)
     description = (
         f"已读取 {len(selected_units)} 个站点的原始数据，并完成 ODS -> DS 转换。"
-        f" ODS 形状为 {ods_df.shape[0]} x {ods_df.shape[1]}，DS 形状为 {ds_df.shape[0]} x {ds_df.shape[1]}。"
+        f" DS 形状为 {ds_df.shape[0]} x {ds_df.shape[1]}。"
     )
 
     payload = {
@@ -138,10 +137,8 @@ def run(state: DGGlobalState) -> Dict:
         "available_file_count": len(selected_units),
         "is_directory": True,
         "raw_dataset_path": str(dataset_path),
-        "ods_dataset_path": str(ods_path),
         "ds_dataset_path": str(ds_path),
         "description": description,
-        "ods_shape": [int(ods_df.shape[0]), int(ods_df.shape[1])],
         "ds_shape": [int(ds_df.shape[0]), int(ds_df.shape[1])],
         "columns": [str(column) for column in ds_df.columns.tolist()],
         "ods_to_ds_config": ods_to_ds_config,
@@ -152,6 +149,5 @@ def run(state: DGGlobalState) -> Dict:
     return {
         "message": "ods and ds datasets prepared successfully",
         "selected_unit_count": len(selected_units),
-        "ods_shape": payload["ods_shape"],
         "ds_shape": payload["ds_shape"],
     }

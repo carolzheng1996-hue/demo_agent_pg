@@ -26,19 +26,20 @@ PIPELINE_RUNTIME_DEFAULTS: Dict[str, Any] = {
     "formatter_unit": "",
     "start_stage": "data_reading",
     "end_stage": "summary",
+    "enable_split": True,
     "skip_split": False,
+    "enable_feature_engineering": True,
     "target_col": "",
     "input_feature_cols": "",
     "split_method": "global_last_k",
     "split_cutoff_date": "",
     "split_test_units": "",
     "train_ratio": 0.7,
-    "val_ratio": 0.1,
-    "test_ratio": 0.2,
+    "val_ratio": 0.3,
     "input_length": 96,
     "output_length": 24,
     "points_per_day": 96,
-    "time_increment": 1,
+    "enable_normalization": True,
     "normalization_policy": "auto",
     "use_system_random": True,
     "max_iterations": DEFAULT_MAX_ITERATIONS,
@@ -94,7 +95,13 @@ def build_runtime_state(
     ]:
         payload[key] = str(payload.get(key, "") or "").strip()
 
-    payload["skip_split"] = _coerce_boolish(payload.get("skip_split"), default=False)
+    payload["enable_split"] = _coerce_boolish(
+        payload.get("enable_split"),
+        default=not _coerce_boolish(payload.get("skip_split"), default=False),
+    )
+    payload["skip_split"] = not payload["enable_split"]
+    payload["enable_feature_engineering"] = _coerce_boolish(payload.get("enable_feature_engineering"), default=True)
+    payload["enable_normalization"] = _coerce_boolish(payload.get("enable_normalization"), default=True)
     payload["use_system_random"] = _coerce_boolish(payload.get("use_system_random"), default=True)
     payload["points_per_day"] = int(payload.get("points_per_day") or PIPELINE_RUNTIME_DEFAULTS["points_per_day"])
     payload["max_iterations"] = max(1, min(int(payload.get("max_iterations") or DEFAULT_MAX_ITERATIONS), MAX_ITERATIONS_CAP))

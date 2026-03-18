@@ -19,7 +19,8 @@
   - `formatter_unit`
   - `start_stage`
   - `end_stage`
-  - `skip_split`
+  - `enable_split`
+  - `enable_feature_engineering`
   - `target_col`
   - `input_feature_cols`
   - `split_method`
@@ -27,11 +28,10 @@
   - `split_test_units`
   - `train_ratio`
   - `val_ratio`
-  - `test_ratio`
   - `input_length`
   - `output_length`
   - `points_per_day`
-  - `time_increment`
+  - `enable_normalization`
   - `normalization_policy`
   - `use_system_random`
   - `max_iterations`
@@ -52,7 +52,9 @@
 - 当 `start_stage` 不是 `data_reading` 时，`dataset_path` 可以改为对应中间产物路径：
   - `data_formatter`：`ds_dataset.parquet` 或其所在目录
   - `data_analysis` / `feature_engineering` / `split_strategy` / `datanorm`：`formatted_dataset_*.parquet` 所在目录
-  - `preprocess`：`feature_engineering_engineered_dataset_*.parquet` 所在 iteration 目录，或包含这些工件的任务根目录
+  - `preprocess`：
+    - `enable_feature_engineering=true`：`feature_engineering_engineered_dataset_*.parquet` 所在 iteration 目录，或包含这些工件的任务根目录
+    - `enable_feature_engineering=false`：`formatted_dataset_*.parquet` 所在目录，或包含这些工件的任务根目录
   - `model_selection` / `model_training`：`train_preprocessed.parquet` 所在目录
 
 `split_method` 支持：
@@ -65,7 +67,9 @@
 附加切分参数：
 - `split_cutoff_date` 仅在 `split_method=fixed_date` 时生效
 - `split_test_units` 仅在 `split_method=leave_stations_out` 时生效，多个站点用逗号分隔
-- `skip_split=true` 时会跳过 `split_strategy`，并同时跳过 `model_integration` 与 `evaluator`
+- `enable_split=false` 时会跳过 `split_strategy`，并同时跳过 `model_integration` 与 `evaluator`
+- `enable_feature_engineering=false` 时会跳过 `feature_engineering`，`preprocess` 将直接读取 formatted 数据
+- `enable_normalization=false` 时会保留 `preprocess`，但不执行缩放标准化
 
 阶段控制参数：
 - `start_stage`：允许从指定阶段启动流程
@@ -78,8 +82,8 @@ DS 清洗参数：
 - `data_formatter` 会在 DS 进入切分和模型前，按 `input_length/output_length` 做序列补齐，并按 `points_per_day` 用“前一天同一时间点”优先填补数组内 NaN
 
 切分比例说明：
-- `train_ratio`、`val_ratio`、`test_ratio` 允许输入非归一化数值
-- 后端会自动归一化，例如 `8 / 2 / 1` 会转换为 `8/11`、`2/11`、`1/11`
+- `train_ratio`、`val_ratio` 允许输入非归一化数值
+- 后端会自动归一化，例如 `8 / 2` 会转换为 `0.8 / 0.2`
 
 UI 交互约束：
 - `Split Cutoff` 仅在 `split_method=fixed_date` 时显示
@@ -87,6 +91,7 @@ UI 交互约束：
 - 如果阶段范围不包含 `split_strategy`，切分相关字段会自动折叠
 - 如果当前任务不进入模型阶段，`max_iterations` 会自动折叠
 - 如果当前阶段范围不包含 `data_reading/data_formatter`，`Points Per Day` 会自动折叠
+- `enable_feature_engineering`、`enable_split`、`enable_normalization` 是当前版本最主要的三个流程控制开关
 
 ### `GET /api/jobs/<job_id>`
 

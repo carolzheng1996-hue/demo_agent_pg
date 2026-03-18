@@ -30,13 +30,11 @@ except ImportError:
 def _window_config(state: DGGlobalState) -> Dict:
     input_length = state.read("input_length")
     output_length = state.read("output_length")
-    time_increment = state.read("time_increment")
-    if input_length is None or output_length is None or time_increment is None:
-        raise ValueError("input_length/output_length/time_increment is missing in state. Please provide them in config_all.json or runtime args.")
+    if input_length is None or output_length is None:
+        raise ValueError("input_length/output_length is missing in state. Please provide them in config_all.json or runtime args.")
     return {
         "input_length": int(input_length),
         "output_length": int(output_length),
-        "time_increment": int(time_increment),
     }
 
 
@@ -44,11 +42,10 @@ def _normalized_ratios(profile: Dict, state: DGGlobalState) -> Dict[str, float]:
     ratios = profile.get("split_ratios") or {
         "train_ratio": state.read("train_ratio"),
         "val_ratio": state.read("val_ratio"),
-        "test_ratio": state.read("test_ratio"),
     }
-    if any(ratios.get(key) is None for key in ["train_ratio", "val_ratio", "test_ratio"]):
-        raise ValueError("train_ratio/val_ratio/test_ratio is missing in state. Please provide them in config_all.json or runtime args.")
-    normalized = {key: float(ratios[key]) for key in ["train_ratio", "val_ratio", "test_ratio"]}
+    if any(ratios.get(key) is None for key in ["train_ratio", "val_ratio"]):
+        raise ValueError("train_ratio/val_ratio is missing in state. Please provide them in config_all.json or runtime args.")
+    normalized = {key: float(ratios[key]) for key in ["train_ratio", "val_ratio"]}
     if any(value < 0 for value in normalized.values()):
         raise ValueError(f"split ratios must be non-negative, got {normalized}")
     total = sum(normalized.values())
@@ -79,10 +76,10 @@ def _load_formatted_dataframe(state: DGGlobalState) -> pd.DataFrame:
     return dataframe
 
 
-def _apply_primary_split(
+def _apply_split(
     df: pd.DataFrame,
     method: str,
-    test_ratio: float,
+    val_ratio: float,
     cutoff_date: str,
     test_units: List[str],
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -93,11 +90,11 @@ def _apply_primary_split(
         )
 
     if method == "station_last_k":
-        return split_station_last_k(df, k=test_ratio)
+        return split_station_last_k(df, k=val_ratio)
     if method == "station_month_last_k":
-        return split_station_month_last_k(df, k=test_ratio)
+        return split_station_month_last_k(df, k=val_ratio)
     if method == "global_last_k":
-        return split_global_last_k(df, k=test_ratio)
+        return split_global_last_k(df, k=val_ratio)
     if method == "fixed_date":
         if not cutoff_date:
             raise ValueError("split_cutoff_date is required when split_method=fixed_date")
@@ -107,17 +104,6 @@ def _apply_primary_split(
             raise ValueError("split_test_units is required when split_method=leave_stations_out")
         return split_leave_stations_out(df, test_station_ids=test_units)
     raise ValueError(f"Unsupported split_method: {method}")
-
-
-def _apply_validation_split(df: pd.DataFrame, method: str, val_ratio_within_train: float) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    if len(df) <= 1:
-        raise ValueError("Training partition is too small to create a validation split.")
-
-    if method == "station_last_k":
-        return split_station_last_k(df, k=val_ratio_within_train)
-    if method == "station_month_last_k":
-        return split_station_month_last_k(df, k=val_ratio_within_train)
-    return split_global_last_k(df, k=val_ratio_within_train)
 
 
 def run(state: DGGlobalState) -> Dict:
@@ -135,24 +121,18 @@ def run(state: DGGlobalState) -> Dict:
     split_test_units = [item.strip() for item in str(state.read("split_test_units") or "").split(",") if item.strip()]
     window_payload = _window_config(state)
 
-    train_val_df, test_df = _apply_primary_split(
+    train_df, val_df = _apply_split(
         dataframe,
         method=split_method,
-        test_ratio=ratios["test_ratio"],
+        val_ratio=ratios["val_ratio"],
         cutoff_date=split_cutoff_date,
         test_units=split_test_units,
     )
-    if train_val_df.empty or test_df.empty:
-        raise ValueError("Split strategy produced an empty train/val or test dataset.")
-
-    val_ratio_within_train = ratios["val_ratio"] / max(ratios["train_ratio"] + ratios["val_ratio"], 1e-8)
-    train_df, val_df = _apply_validation_split(train_val_df, split_method, val_ratio_within_train)
     if train_df.empty or val_df.empty:
         raise ValueError("Split strategy produced an empty training or validation dataset.")
 
     train_path = write_task_dataframe_artifact(state, "data/split/train_dataset.parquet", train_df)
     val_path = write_task_dataframe_artifact(state, "data/split/val_dataset.parquet", val_df)
-    test_path = write_task_dataframe_artifact(state, "data/split/test_dataset.parquet", test_df)
 
     payload = {
         "strategy": split_method,
@@ -164,17 +144,14 @@ def run(state: DGGlobalState) -> Dict:
         "counts": {
             "train": int(len(train_df)),
             "val": int(len(val_df)),
-            "test": int(len(test_df)),
         },
         "dataset_paths": {
             "train": str(train_path),
             "val": str(val_path),
-            "test": str(test_path),
         },
         "row_ids": {
             "train": train_df["__row_id__"].astype(int).tolist() if "__row_id__" in train_df.columns else [],
             "val": val_df["__row_id__"].astype(int).tolist() if "__row_id__" in val_df.columns else [],
-            "test": test_df["__row_id__"].astype(int).tolist() if "__row_id__" in test_df.columns else [],
         },
         "pipeline_source": "data_loading_pg.data_split",
     }

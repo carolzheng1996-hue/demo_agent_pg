@@ -47,7 +47,6 @@ def _ratio_payload(state: DGGlobalState) -> Dict[str, Optional[float]]:
     return {
         "train_ratio": state.read("train_ratio"),
         "val_ratio": state.read("val_ratio"),
-        "test_ratio": state.read("test_ratio"),
     }
 
 
@@ -56,12 +55,11 @@ def _need_split(state: DGGlobalState) -> bool:
 
 
 def _validate_ratios(ratios: Dict[str, Optional[float]]) -> Dict[str, float]:
-    if any(ratios.get(name) is None for name in ["train_ratio", "val_ratio", "test_ratio"]):
-        raise ValueError("train_ratio/val_ratio/test_ratio is missing in state. Please provide them in config_all.json or runtime args.")
+    if any(ratios.get(name) is None for name in ["train_ratio", "val_ratio"]):
+        raise ValueError("train_ratio/val_ratio is missing in state. Please provide them in config_all.json or runtime args.")
     normalized = {
         "train_ratio": float(ratios["train_ratio"]),
         "val_ratio": float(ratios["val_ratio"]),
-        "test_ratio": float(ratios["test_ratio"]),
     }
     if any(value < 0 for value in normalized.values()):
         raise ValueError(f"Split ratios must be non-negative, got {normalized}")
@@ -324,11 +322,6 @@ def _build_station_payload(
 def run(state: DGGlobalState) -> Dict:
     ds_df = _load_ds_dataframe(state)
     ds_df, cleanup_payload = _clean_ds_sequences(ds_df, state)
-    cleaned_ds_path = write_task_dataframe_artifact(
-        state,
-        "data/data_formatter_ds_cleaned.parquet",
-        ds_df,
-    )
     flat_df = _flatten_sequence_columns(ds_df)
     if "station" not in flat_df.columns:
         raise ValueError("Formatted station-wise output requires a station column in DS data.")
@@ -374,14 +367,15 @@ def run(state: DGGlobalState) -> Dict:
     dataset_profile = {
         "dataset_path": state.read("dataset_path"),
         "raw_dataset_path": dataset_loading_result.get("raw_dataset_path"),
-        "ods_dataset_path": dataset_loading_result.get("ods_dataset_path"),
         "ds_dataset_path": dataset_loading_result.get("ds_dataset_path"),
-        "cleaned_ds_dataset_path": str(cleaned_ds_path),
         "formatted_dataset_paths": station_paths,
         "formatted_dataset_path": next(iter(station_paths.values())),
         "unit": dataset_loading_result.get("unit"),
         "selected_units": dataset_loading_result.get("selected_units", []),
+        "enable_split": bool(state.read("enable_split")),
+        "enable_feature_engineering": bool(state.read("enable_feature_engineering")),
         "split_method": str(state.read("split_method") or "").strip(),
+        "enable_normalization": bool(state.read("enable_normalization")),
         "is_directory": True,
         "available_file_count": int(dataset_loading_result.get("available_file_count") or 0),
         "shape": [sum(item["shape"][0] for item in station_profiles.values()), first_profile["shape"][1] if first_profile else 0],
@@ -403,7 +397,6 @@ def run(state: DGGlobalState) -> Dict:
         "dataset_profile": dataset_profile,
         "formatted_dataset_paths": station_paths,
         "station_profiles": station_profiles,
-        "cleaned_ds_dataset_path": str(cleaned_ds_path),
         "sequence_cleanup": cleanup_payload,
         "pipeline_source": "stationwise_formatter",
     }

@@ -36,6 +36,15 @@
 - [x] 审查并补全 README 中的模块职责说明与常见分阶段运行命令，同时修正文档中的执行链顺序
 - [x] 将 DS 序列长度补齐与 NaN 填补逻辑接入 `data_formatter` 入口，并保存清洗后的 DS 工件
 - [x] 复查并修复 `points_per_day` 在 CLI/Web 层缺失暴露的问题，并补齐 `preprocess` 中间启动的 bootstrap
+- [x] 重写 README，去掉旧版本残留内容，仅保留当前版本的流程、产物和可执行命令
+- [x] 在 README 中补充数据处理各阶段的功能说明和对应数据存储路径
+- [x] 移除 ODS parquet 落盘，仅保留 DS 作为 data_reading 阶段对外数据工件
+- [x] 移除 `data_formatter_ds_cleaned.parquet` 落盘，仅保留内存中的清洗后 DS 进入后续流程
+- [x] 移除无实际作用的 `time_increment` 运行参数，避免前后端继续暴露无效输入
+- [x] 新增显式开关 `enable_split` 和 `enable_normalization`，让用户可直接控制是否进行切分和标准化
+- [x] 收敛切分逻辑为单次 train/val 切分，移除 test 集产物与读取链路
+- [x] 新增显式开关 `enable_feature_engineering`，允许直接跳过特征工程并从 formatted 数据进入 preprocess
+- [x] 收敛 README 和前端表单文案，明确三个流程开关及中间启动要求
 
 ## Review
 - 已将旧的通用文件读取逻辑替换为按 `station=<unit>` 分区目录读取，并在 `subagents/data_reading.py` 中接入 `convert_ods_to_ds`
@@ -77,3 +86,12 @@
 - `data_formatter` 现会在展开 DS 之前统一做序列清洗：历史列头部补齐到 `input_length`，`*_predict/*_future` 列尾部补齐到 `output_length`，并按 `points_per_day` 规则填补数组内 NaN；清洗后的 DS 另存为 `output/<task-id>/data/data_formatter_ds_cleaned.parquet`
 - `points_per_day` 现已同时接入 `config_all.json`、CLI 参数、Web 表单和后端 payload 归一化；前端在阶段范围不涉及 `data_reading/data_formatter` 时会自动折叠该字段
 - `start_stage=preprocess` 现可从任务根目录或 iteration 目录回收 engineered parquet 和既有 split row ids，不再是“文档暴露但代码无法可靠启动”的状态
+- README 已重写为当前版本专用文档，删除了与旧结构、旧命令和历史输出形态相关的描述，只保留现有流程说明、`dataset_path` 约束、任务产物说明以及带显式 `target_col/input_feature_cols` 的命令示例
+- README 已新增“数据处理阶段说明”小节，逐步说明 `data_reading`、`data_formatter`、`data_analysis`、`feature_engineering`、`split_strategy`、`datanorm`、`preprocess` 的职责，以及各阶段数据文件的实际落盘路径
+- `data_reading` 现不再保存 `data_reading_ods_dataset.parquet`；ODS 只作为内存中的中间输入传给 `convert_ods_to_ds`，对外仅落盘 `data_reading_ds_dataset.parquet`
+- `data_formatter` 现仍会执行 DS 序列长度补齐和 NaN 填补，但不再单独保存 `data_formatter_ds_cleaned.parquet`；清洗后的 DS 只在内存中继续传给展开和分站点格式化逻辑
+- `time_increment` 已从 CLI、Web 表单、后端 payload 归一化、运行配置和 `split_strategy` 摘要中移除；当前版本的 DS 构造与数据切分均不依赖该参数
+- 运行配置现新增 `enable_split` 和 `enable_normalization` 两个正向布尔开关；`enable_split=false` 会跳过数据切分，`enable_normalization=false` 会保留预处理但关闭标准化缩放
+- `split_strategy` 现只执行一次 train/val 切分，不再先切 test 再二次切 val；模型训练与集成改为以验证集作为唯一评估集
+- 运行配置现新增 `enable_feature_engineering`；关闭后 orchestrator 会从 plan 中移除 `feature_engineering`，`preprocess` 直接读取 formatted 数据继续处理
+- README 现明确说明 `enable_feature_engineering`、`enable_split`、`enable_normalization` 三个流程开关的作用，并补充“关闭三者的最小命令”和 zsh 多行续行注意事项；前端表单字段名也改成了更直白的中文

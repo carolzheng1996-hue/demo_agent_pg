@@ -3,56 +3,56 @@
     "name": "data_reading",
     "status": "done",
     "detail": "ods and ds datasets prepared successfully",
-    "started_at": "2026-03-18T13:01:59",
-    "finished_at": "2026-03-18T13:02:00"
+    "started_at": "2026-03-18T19:36:19",
+    "finished_at": "2026-03-18T19:36:19"
   },
   {
     "name": "data_formatter",
     "status": "done",
     "detail": "data formatted successfully",
-    "started_at": "2026-03-18T13:02:00",
-    "finished_at": "2026-03-18T13:02:02"
+    "started_at": "2026-03-18T19:36:19",
+    "finished_at": "2026-03-18T19:36:20"
   },
   {
     "name": "data_analysis",
     "status": "done",
     "detail": "data analysis completed",
-    "started_at": "2026-03-18T13:02:02",
-    "finished_at": "2026-03-18T13:02:03"
+    "started_at": "2026-03-18T19:36:20",
+    "finished_at": "2026-03-18T19:36:21"
   },
   {
     "name": "feature_engineering",
     "status": "done",
     "detail": "feature engineering completed",
-    "started_at": "2026-03-18T13:02:03",
-    "finished_at": "2026-03-18T13:02:09"
+    "started_at": "2026-03-18T19:36:21",
+    "finished_at": "2026-03-18T19:36:26"
   },
   {
     "name": "split_strategy",
     "status": "done",
     "detail": "split strategy created",
-    "started_at": "2026-03-18T13:02:09",
-    "finished_at": "2026-03-18T13:02:10"
+    "started_at": "2026-03-18T19:36:26",
+    "finished_at": "2026-03-18T19:36:27"
   },
   {
     "name": "datanorm",
     "status": "done",
     "detail": "normalization policy decided",
-    "started_at": "2026-03-18T13:02:10",
-    "finished_at": "2026-03-18T13:02:10"
+    "started_at": "2026-03-18T19:36:27",
+    "finished_at": "2026-03-18T19:36:27"
   },
   {
     "name": "preprocess",
     "status": "done",
     "detail": "preprocess completed",
-    "started_at": "2026-03-18T13:02:10",
-    "finished_at": "2026-03-18T13:02:15"
+    "started_at": "2026-03-18T19:36:27",
+    "finished_at": "2026-03-18T19:36:30"
   },
   {
     "name": "summary",
     "status": "done",
     "detail": "summary report generated",
-    "started_at": "2026-03-18T13:02:15",
-    "finished_at": "2026-03-18T13:02:15"
+    "started_at": "2026-03-18T19:36:30",
+    "finished_at": "2026-03-18T19:36:30"
   }
 ]

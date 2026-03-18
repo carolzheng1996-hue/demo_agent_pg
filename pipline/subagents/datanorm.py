@@ -44,6 +44,15 @@ def _auto_decision(state: DGGlobalState) -> Dict:
 
 
 def run(state: DGGlobalState) -> Dict:
+    enable_normalization = state.read("enable_normalization")
+    if enable_normalization is None:
+        raise ValueError("enable_normalization is missing in state. Please provide it in config_all.json or runtime args.")
+    if not bool(enable_normalization):
+        result = {"should_normalize": False, "recommended_mode": "skip", "reason": "user_disabled_normalization"}
+        state.write("datanorm_result", result)
+        write_step_artifact(state, "datanorm", result)
+        return {"message": "normalization policy decided", **result}
+
     policy_override = str(state.read("normalization_policy") or "").lower()
     if not policy_override:
         raise ValueError("normalization_policy is missing in state. Please provide it in config_all.json or runtime args.")

@@ -97,7 +97,14 @@ class DGOrchestrator:
         return cls.ANALYSIS_STAGE_ORDER
 
     @classmethod
-    def _slice_plan(cls, stage_order: List[str], start_stage: str, end_stage: str, skip_split: bool) -> List[str]:
+    def _slice_plan(
+        cls,
+        stage_order: List[str],
+        start_stage: str,
+        end_stage: str,
+        skip_split: bool,
+        enable_feature_engineering: bool,
+    ) -> List[str]:
         if start_stage not in stage_order or end_stage not in stage_order:
             raise ValueError(f"Unsupported stage range: {start_stage} -> {end_stage}")
         start_index = stage_order.index(start_stage)
@@ -106,14 +113,23 @@ class DGOrchestrator:
             raise ValueError(f"start_stage must not be after end_stage: {start_stage} -> {end_stage}")
 
         plan = stage_order[start_index : end_index + 1]
+        if not enable_feature_engineering:
+            plan = [step for step in plan if step != "feature_engineering"]
         if skip_split:
             plan = [step for step in plan if step not in {"split_strategy", "model_integration", "evaluator"}]
         return plan
 
     @classmethod
-    def _canonical_plan(cls, intent: str, start_stage: str, end_stage: str, skip_split: bool) -> Tuple[List[str], Dict]:
+    def _canonical_plan(
+        cls,
+        intent: str,
+        start_stage: str,
+        end_stage: str,
+        skip_split: bool,
+        enable_feature_engineering: bool,
+    ) -> Tuple[List[str], Dict]:
         stage_order = cls._stage_order_for_intent(intent, start_stage, end_stage)
-        plan = cls._slice_plan(stage_order, start_stage, end_stage, skip_split)
+        plan = cls._slice_plan(stage_order, start_stage, end_stage, skip_split, enable_feature_engineering)
         requires_modeling = any(step in cls.MODEL_STAGES for step in plan)
         if requires_modeling:
             task_type = "forecast_modeling"
@@ -136,6 +152,7 @@ class DGOrchestrator:
             "start_stage": start_stage,
             "end_stage": end_stage,
             "skip_split": skip_split,
+            "enable_feature_engineering": enable_feature_engineering,
         }
 
     @staticmethod
@@ -193,12 +210,11 @@ class DGOrchestrator:
     def _resolve_preprocess_paths(dataset_path: str) -> Dict[str, str]:
         candidate = Path(str(dataset_path))
         if candidate.is_file():
-            raise ValueError("Preprocess bootstrap requires a directory containing train/val/test parquet files.")
+            raise ValueError("Preprocess bootstrap requires a directory containing train/val parquet files.")
 
         mapping = {
             "train": candidate / "train_preprocessed.parquet",
             "val": candidate / "val_preprocessed.parquet",
-            "test": candidate / "test_preprocessed.parquet",
         }
         result = {name: str(path) for name, path in mapping.items() if path.exists()}
         if "train" not in result:
@@ -238,7 +254,6 @@ class DGOrchestrator:
         mapping = {
             "train": "train_dataset.parquet",
             "val": "val_dataset.parquet",
-            "test": "test_dataset.parquet",
         }
         for split_dir in split_dir_candidates:
             if not split_dir.exists():
@@ -373,7 +388,10 @@ class DGOrchestrator:
             self._bootstrap_formatted_profile(dataset_path)
             return
         if start_stage == "preprocess":
-            self._bootstrap_engineered_profile(dataset_path)
+            if bool(self.state.read("enable_feature_engineering")):
+                self._bootstrap_engineered_profile(dataset_path)
+            else:
+                self._bootstrap_formatted_profile(dataset_path)
             return
         if start_stage in {"model_selection", "model_training", "model_integration", "evaluator", "summary"}:
             self._bootstrap_preprocess_profile(dataset_path)
@@ -442,13 +460,13 @@ class DGOrchestrator:
             self.state.write("cross_iteration_ensemble_result", result)
             return result
 
-        test_target = self.state.read_runtime("test_target")
-        if test_target is None:
-            result = {"available": False, "reason": "missing_test_target"}
+        validation_target = self.state.read_runtime("validation_target")
+        if validation_target is None:
+            result = {"available": False, "reason": "missing_validation_target"}
             self.state.write("cross_iteration_ensemble_result", result)
             return result
 
-        ensemble_result = mean_ensemble(best_iteration_artifacts, test_target)
+        ensemble_result = mean_ensemble(best_iteration_artifacts, validation_target)
         payload = {
             "available": True,
             "strategy": "cross_iteration_best_model_average",
@@ -491,11 +509,19 @@ class DGOrchestrator:
         end_stage = str(self.state.read("end_stage") or "").strip()
         if not start_stage or not end_stage:
             raise ValueError("start_stage/end_stage is missing in state. Please provide them in config_all.json or runtime args.")
-        skip_split_value = self.state.read("skip_split")
-        if skip_split_value is None:
-            raise ValueError("skip_split is missing in state. Please provide it in config_all.json or runtime args.")
-        skip_split = bool(skip_split_value)
-        plan, plan_meta = self._canonical_plan(intent, start_stage, end_stage, skip_split)
+        enable_split_value = self.state.read("enable_split")
+        if enable_split_value is None:
+            skip_split_value = self.state.read("skip_split")
+            if skip_split_value is None:
+                raise ValueError("enable_split is missing in state. Please provide it in config_all.json or runtime args.")
+            enable_split = not bool(skip_split_value)
+        else:
+            enable_split = bool(enable_split_value)
+        skip_split = not enable_split
+        enable_feature_engineering_value = self.state.read("enable_feature_engineering")
+        if enable_feature_engineering_value is None:
+            raise ValueError("enable_feature_engineering is missing in state. Please provide it in config_all.json or runtime args.")
+        plan, plan_meta = self._canonical_plan(intent, start_stage, end_stage, skip_split, bool(enable_feature_engineering_value))
         self.state.update(
             {
                 "user_query": user_query,

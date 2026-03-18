@@ -75,8 +75,10 @@ def parse_args() -> argparse.Namespace:
         ],
         help="流程结束阶段",
     )
-    parser.add_argument("--skip-split", dest="skip_split", action="store_true", default=bool(defaults["skip_split"]), help="跳过训练/验证/测试切分")
-    parser.add_argument("--enable-split", dest="skip_split", action="store_false", help="启用训练/验证/测试切分")
+    parser.add_argument("--enable-split", dest="enable_split", action="store_true", default=bool(defaults["enable_split"]), help="启用训练/验证切分")
+    parser.add_argument("--disable-split", dest="enable_split", action="store_false", help="关闭训练/验证切分")
+    parser.add_argument("--enable-feature-engineering", dest="enable_feature_engineering", action="store_true", default=bool(defaults["enable_feature_engineering"]), help="启用特征工程")
+    parser.add_argument("--disable-feature-engineering", dest="enable_feature_engineering", action="store_false", help="关闭特征工程，预处理将直接使用 formatted 数据")
     parser.add_argument("--target-col", default=defaults["target_col"], help="显式指定目标列，多个列用逗号分隔")
     parser.add_argument("--input-feature-cols", default=defaults["input_feature_cols"], help="显式指定模型输入列，多个列用逗号分隔")
     parser.add_argument(
@@ -89,11 +91,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--split-test-units", default=defaults["split_test_units"], help="留站切分时使用，多个站点用逗号分隔")
     parser.add_argument("--train-ratio", type=float, default=defaults["train_ratio"], help="训练集比例")
     parser.add_argument("--val-ratio", type=float, default=defaults["val_ratio"], help="验证集比例")
-    parser.add_argument("--test-ratio", type=float, default=defaults["test_ratio"], help="测试集比例")
     parser.add_argument("--input-length", type=int, default=defaults["input_length"], help="输入窗口长度")
     parser.add_argument("--output-length", type=int, default=defaults["output_length"], help="输出窗口长度")
     parser.add_argument("--points-per-day", type=int, default=defaults["points_per_day"], help="每天的采样点数，用于 DS 序列缺失填补")
-    parser.add_argument("--time-increment", type=int, default=defaults["time_increment"], help="滑窗步长")
+    parser.add_argument("--enable-normalization", dest="enable_normalization", action="store_true", default=bool(defaults["enable_normalization"]), help="启用标准化")
+    parser.add_argument("--disable-normalization", dest="enable_normalization", action="store_false", help="关闭标准化，仅做预处理清洗")
     parser.add_argument(
         "--normalization-policy",
         choices=["auto", "off", "zscore", "minmax"],
@@ -118,7 +120,9 @@ def main() -> None:
             "formatter_unit": args.formatter_unit,
             "start_stage": args.start_stage,
             "end_stage": args.end_stage,
-            "skip_split": args.skip_split,
+            "enable_split": args.enable_split,
+            "skip_split": not args.enable_split,
+            "enable_feature_engineering": args.enable_feature_engineering,
             "target_col": args.target_col,
             "input_feature_cols": args.input_feature_cols,
             "split_method": args.split_method,
@@ -126,11 +130,10 @@ def main() -> None:
             "split_test_units": args.split_test_units,
             "train_ratio": args.train_ratio,
             "val_ratio": args.val_ratio,
-            "test_ratio": args.test_ratio,
             "input_length": args.input_length,
             "output_length": args.output_length,
             "points_per_day": args.points_per_day,
-            "time_increment": args.time_increment,
+            "enable_normalization": args.enable_normalization,
             "normalization_policy": args.normalization_policy,
             "use_system_random": args.use_system_random,
             "max_iterations": args.max_iterations,

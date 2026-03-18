@@ -109,7 +109,9 @@ def load_task_detail(task_id: str) -> Dict[str, Any]:
         "selected_units": [item.strip() for item in str(job_payload.get("unit", "")).split(",") if item.strip()],
         "start_stage": job_payload.get("start_stage") or plan_meta.get("start_stage"),
         "end_stage": job_payload.get("end_stage") or plan_meta.get("end_stage"),
-        "skip_split": job_payload.get("skip_split"),
+        "enable_split": job_payload.get("enable_split"),
+        "enable_feature_engineering": job_payload.get("enable_feature_engineering"),
+        "enable_normalization": job_payload.get("enable_normalization"),
         "data_artifacts": _list_artifacts(task_dir / "data"),
     }
     iteration_history: Dict[str, Any] = {}
@@ -350,7 +352,7 @@ class DGRequestHandler(BaseHTTPRequestHandler):
     def _normalize_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         config_path = Path(str(payload.get("config_all") or CONFIG_ALL_FILE)).expanduser()
         defaults = runtime_defaults(config_path)
-        ratios_required = any(payload.get(name) not in (None, "") for name in ("train_ratio", "val_ratio", "test_ratio"))
+        ratios_required = any(payload.get(name) not in (None, "") for name in ("train_ratio", "val_ratio"))
         normalized = {
             "config_all": str(config_path),
             "query": str(payload.get("query", "")).strip(),
@@ -360,7 +362,8 @@ class DGRequestHandler(BaseHTTPRequestHandler):
             "formatter_unit": str(payload.get("formatter_unit", defaults["formatter_unit"])).strip(),
             "start_stage": str(payload.get("start_stage", defaults["start_stage"])).strip() or defaults["start_stage"],
             "end_stage": str(payload.get("end_stage", defaults["end_stage"])).strip() or defaults["end_stage"],
-            "skip_split": self._coerce_bool(payload.get("skip_split"), default=bool(defaults["skip_split"])),
+            "enable_split": self._coerce_bool(payload.get("enable_split"), default=bool(defaults["enable_split"])),
+            "enable_feature_engineering": self._coerce_bool(payload.get("enable_feature_engineering"), default=bool(defaults["enable_feature_engineering"])),
             "target_col": str(payload.get("target_col", defaults["target_col"])).strip(),
             "input_feature_cols": str(payload.get("input_feature_cols", defaults["input_feature_cols"])).strip(),
             "split_method": str(payload.get("split_method", defaults["split_method"])).strip() or defaults["split_method"],
@@ -368,15 +371,15 @@ class DGRequestHandler(BaseHTTPRequestHandler):
             "split_test_units": str(payload.get("split_test_units", defaults["split_test_units"])).strip(),
             "train_ratio": self._coerce_float(payload.get("train_ratio")) if ratios_required else float(defaults["train_ratio"]),
             "val_ratio": self._coerce_float(payload.get("val_ratio")) if ratios_required else float(defaults["val_ratio"]),
-            "test_ratio": self._coerce_float(payload.get("test_ratio")) if ratios_required else float(defaults["test_ratio"]),
             "input_length": self._coerce_int(payload.get("input_length")) if payload.get("input_length") not in (None, "") else int(defaults["input_length"]),
             "output_length": self._coerce_int(payload.get("output_length")) if payload.get("output_length") not in (None, "") else int(defaults["output_length"]),
             "points_per_day": self._coerce_int(payload.get("points_per_day")) if payload.get("points_per_day") not in (None, "") else int(defaults["points_per_day"]),
-            "time_increment": self._coerce_int(payload.get("time_increment")) if payload.get("time_increment") not in (None, "") else int(defaults["time_increment"]),
+            "enable_normalization": self._coerce_bool(payload.get("enable_normalization"), default=bool(defaults["enable_normalization"])),
             "normalization_policy": str(payload.get("normalization_policy", defaults["normalization_policy"])).strip() or defaults["normalization_policy"],
             "use_system_random": self._coerce_bool(payload.get("use_system_random"), default=bool(defaults["use_system_random"])),
             "max_iterations": int(payload.get("max_iterations") or defaults["max_iterations"]),
         }
+        normalized["skip_split"] = not normalized["enable_split"]
         if not normalized["query"]:
             raise ValueError("query is required")
         if not normalized["dataset_path"]:
