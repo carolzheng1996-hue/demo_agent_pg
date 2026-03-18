@@ -1,0 +1,47 @@
+{
+  "selected_methods": [
+    "lag_signature",
+    "calendar_signature",
+    "peak_signature"
+  ],
+  "engineered_columns": [
+    "HULL_lag_1",
+    "HULL_lag_6",
+    "HULL_lag_12",
+    "HULL_lag_24",
+    "OT_lag_1",
+    "OT_lag_6",
+    "OT_lag_12",
+    "OT_lag_24",
+    "hour",
+    "dayofweek",
+    "day",
+    "month",
+    "is_weekend",
+    "HULL_abs_energy_24",
+    "HULL_peak_count_24",
+    "HULL_turning_points_24",
+    "OT_abs_energy_24",
+    "OT_peak_count_24",
+    "OT_turning_points_24"
+  ],
+  "source_columns": [
+    "HULL",
+    "OT"
+  ],
+  "engineered_feature_count": 19,
+  "shape": [
+    17420,
+    23
+  ],
+  "iteration_index": 3,
+  "strategy_seed_basis": "20260315_201731_cd2e6cf7:3:2",
+  "tsfresh_inspired_notes": {
+    "lag_signature": "多阶滞后特征",
+    "rolling_signature": "滚动统计量特征",
+    "difference_signature": "差分与变化率特征",
+    "ewm_signature": "指数加权统计特征",
+    "peak_signature": "局部峰值/能量/转折点特征",
+    "calendar_signature": "时间日历特征"
+  }
+}

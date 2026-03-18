@@ -7,15 +7,11 @@
     "split_strategy",
     "datanorm",
     "preprocess",
-    "model_selection",
-    "model_training",
-    "model_integration",
-    "evaluator",
     "summary"
   ],
   "plan_meta": {
-    "task_type": "forecast_modeling",
-    "requires_modeling": true,
+    "task_type": "data_processing",
+    "requires_modeling": false,
     "requires_split": true,
     "teams": [
       "discovery_team",
@@ -23,6 +19,9 @@
       "reporting_team"
     ],
     "reason": "deterministic_pipeline",
-    "plan_source": "rule_based"
+    "plan_source": "rule_based",
+    "start_stage": "data_reading",
+    "end_stage": "summary",
+    "skip_split": false
   }
 }

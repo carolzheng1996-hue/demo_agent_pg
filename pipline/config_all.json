@@ -1,0 +1,23 @@
+{
+  "dataset_name": "sample_dataset",
+  "unit": "",
+  "formatter_unit": "",
+  "start_stage": "data_reading",
+  "end_stage": "summary",
+  "skip_split": false,
+  "target_col": "",
+  "input_feature_cols": "",
+  "split_method": "global_last_k",
+  "split_cutoff_date": "",
+  "split_test_units": "",
+  "train_ratio": 0.7,
+  "val_ratio": 0.1,
+  "test_ratio": 0.2,
+  "input_length": 96,
+  "output_length": 24,
+  "points_per_day": 96,
+  "time_increment": 1,
+  "normalization_policy": "auto",
+  "use_system_random": true,
+  "max_iterations": 3
+}

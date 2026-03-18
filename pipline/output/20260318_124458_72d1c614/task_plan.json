@@ -1,0 +1,30 @@
+{
+  "plan": [
+    "data_reading",
+    "data_formatter",
+    "data_analysis",
+    "feature_engineering",
+    "split_strategy",
+    "datanorm",
+    "preprocess",
+    "summary"
+  ],
+  "plan_meta": {
+    "task_type": "data_processing",
+    "requires_modeling": false,
+    "requires_split": true,
+    "teams": [
+      "discovery_team",
+      "modeling_team",
+      "reporting_team"
+    ],
+    "reason": "deterministic_pipeline",
+    "plan_source": "rule_based",
+    "start_stage": "data_reading",
+    "end_stage": "summary",
+    "skip_split": false
+  },
+  "dataset_path": "/Users/monychen/Documents/demo-zjl/pipline/sample_station_data",
+  "dataset_name": "sample_dataset",
+  "user_query": "只做数据处理"
+}

@@ -1,0 +1,71 @@
+{
+  "dataset_profile": {
+    "dataset_path": "/Users/monychen/Documents/demo-zjl/data/ETTh1.csv",
+    "is_directory": false,
+    "supported_files": [
+      "/Users/monychen/Documents/demo-zjl/data/ETTh1.csv"
+    ],
+    "loaded_files": [
+      "/Users/monychen/Documents/demo-zjl/data/ETTh1.csv"
+    ],
+    "available_file_count": 1,
+    "file_type": "csv",
+    "shape": [
+      17420,
+      8
+    ],
+    "standardized_shape": [
+      17420,
+      6
+    ],
+    "columns": [
+      "date",
+      "HUFL",
+      "HULL",
+      "MUFL",
+      "MULL",
+      "LUFL",
+      "LULL",
+      "OT"
+    ],
+    "date_column": "date",
+    "target_column": "OT",
+    "target_columns": [
+      "OT"
+    ],
+    "feature_columns": [
+      "HULL",
+      "HUFL"
+    ],
+    "derived_time_columns": [
+      "date",
+      "hour",
+      "minute"
+    ],
+    "input_feature_columns": [
+      "HULL",
+      "HUFL"
+    ],
+    "need_split": true,
+    "split_ratios": {
+      "train_ratio": 0.7,
+      "val_ratio": 0.1,
+      "test_ratio": 0.2
+    },
+    "sorted_by_time": true
+  },
+  "target_preference": null,
+  "selected_columns": [
+    "date",
+    "HULL",
+    "HUFL",
+    "hour",
+    "minute",
+    "OT"
+  ],
+  "standardized_shape": [
+    17420,
+    6
+  ],
+  "pipeline_source": "deterministic_formatter"
+}

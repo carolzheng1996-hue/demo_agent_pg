@@ -1,0 +1,28 @@
+{
+  "selected_strategy": "best_single",
+  "best_single_score": 0.5234499985799108,
+  "ensemble_score": 1.9556737309268297,
+  "iteration_best_result": {
+    "iteration_index": 1,
+    "strategy": "best_single",
+    "name": "xgboost",
+    "backend": "xgboost",
+    "member_models": [
+      "xgboost"
+    ],
+    "metrics": {
+      "mse": 0.5352780110027416,
+      "mae": 0.5234499985799108,
+      "rmse": 0.7316269616428455,
+      "mape": 66594793.94476975
+    },
+    "prediction_points": 3484
+  },
+  "iteration_index": 1,
+  "best_score": 0.5234499985799108,
+  "best_previous_score": null,
+  "improved": true,
+  "stagnant_rounds": 0,
+  "should_continue": true,
+  "stop_reason": "continue_search"
+}

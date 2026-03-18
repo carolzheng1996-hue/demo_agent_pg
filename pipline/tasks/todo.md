@@ -25,6 +25,17 @@
 - [x] 为非 `summary` 结尾的 plan 增加任务级 `final_summary.md` 兜底生成逻辑
 - [x] 修复 `summary` 对 `Timestamp` 等对象的 JSON 序列化报错
 - [x] 在 README 中补充 `start_stage/end_stage` 合法组合、`dataset_path` 要求和最新输出结构
+- [x] 在 README 中补充可直接执行的数据处理测试命令
+- [x] 将默认运行参数统一收口到 `config.py`，并让 CLI/Web 共用同一套默认值
+- [x] 新增 `config_all.json` 作为统一运行配置入口，并将读取结果写入 state
+- [x] 清理 subagent/orchestrator 中与运行参数相关的硬编码兜底，改为统一从 state/config 取值
+- [x] 修复 `只做数据处理 + end_stage=summary` 仍误入模型阶段的问题
+- [x] 补齐 CLI/Web 参数联动与覆盖逻辑，减少当前场景下无效参数的暴露
+- [x] 修复 Web 任务详情仍依赖旧 `result.json` 目录结构的问题，改为读取任务级 plan 与 summary/data 工件
+- [x] 去掉 orchestrator 中残留的 `skip_split` 运行态默认值，避免再次出现隐式回退
+- [x] 审查并补全 README 中的模块职责说明与常见分阶段运行命令，同时修正文档中的执行链顺序
+- [x] 将 DS 序列长度补齐与 NaN 填补逻辑接入 `data_formatter` 入口，并保存清洗后的 DS 工件
+- [x] 复查并修复 `points_per_day` 在 CLI/Web 层缺失暴露的问题，并补齐 `preprocess` 中间启动的 bootstrap
 
 ## Review
 - 已将旧的通用文件读取逻辑替换为按 `station=<unit>` 分区目录读取，并在 `subagents/data_reading.py` 中接入 `convert_ods_to_ds`
@@ -52,3 +63,17 @@
 - 任务结束时现会统一检查 `final_summary.md` 是否已生成；若本次 plan 未包含 `summary` 步骤，也会自动补跑一次 `summary`，保证任务级总结始终存在
 - `summary` 中展示各阶段 state payload 时，现统一通过 `default=str` 序列化，避免 `Timestamp`、numpy 标量等对象阻塞任务收尾
 - README 已同步当前真实行为：一次性产物位于任务级 `data/`，各阶段不再单独产出目录/json，并补充了分阶段执行的合法组合和中间启动要求
+- README 已新增可复制执行的测试命令，覆盖示例数据生成、ODS/DS、完整预处理、从任务目录继续执行和仅切分验证
+- `train_ratio`、`split_method`、窗口长度、标准化策略等默认值现统一由 `config.py` 中的 `PIPELINE_RUNTIME_DEFAULTS` 提供，CLI 与 Web 的默认行为已对齐
+- 现在 CLI、Web 和 state 初始化都会先读取 `config_all.json`，用户或 agent 可以通过改 JSON 统一调整运行参数，再由显式传参做最后覆盖
+- `input_length`、`output_length`、切分比例、标准化策略、`max_iterations`、`start_stage/end_stage` 等运行参数，已不再在 `data_reading`、`split_strategy`、`datanorm`、`evaluator`、`orchestrator` 中各自维护隐藏默认值
+- orchestrator 现按任务意图选择阶段链：数据处理任务使用不含 `model_selection/model_training/model_integration/evaluator` 的链路，因此 `end_stage=summary` 只表示“生成总结”，不再强制进入模型训练
+- CLI 现通过预解析 `--config-all` 加载正确的参数默认值，并新增 `--enable-split` 用于覆盖 `config_all.json` 中的 `skip_split=true`
+- 前端表单现会按任务意图、阶段范围、`split_method` 与 `skip_split` 动态折叠无效字段，降低“前后端参数不一致”的感知成本
+- Web 任务详情现基于任务级 `task_plan.json`、`summary.md`、`final_summary.md` 和 `data/` 工件展示，不再依赖已移除的每阶段 `result.json` 目录结构
+- orchestrator 现会把最终 plan 和 plan_meta 写入任务级 `task_plan.json`，供 Web/后续复盘统一读取
+- `skip_split` 已不再在 orchestrator 中偷偷回退到 `False`；若配置缺失会显式报错，继续保持“配置只从 config_all/state 来”的约束
+- README 现已明确区分编排层、数据处理层、模型层和工件层的职责，并补充了“只做 ODS/DS”“从 DS 到 formatted”“从 formatted 到 preprocess”“从 preprocessed 直接训练”等常见命令示例
+- `data_formatter` 现会在展开 DS 之前统一做序列清洗：历史列头部补齐到 `input_length`，`*_predict/*_future` 列尾部补齐到 `output_length`，并按 `points_per_day` 规则填补数组内 NaN；清洗后的 DS 另存为 `output/<task-id>/data/data_formatter_ds_cleaned.parquet`
+- `points_per_day` 现已同时接入 `config_all.json`、CLI 参数、Web 表单和后端 payload 归一化；前端在阶段范围不涉及 `data_reading/data_formatter` 时会自动折叠该字段
+- `start_stage=preprocess` 现可从任务根目录或 iteration 目录回收 engineered parquet 和既有 split row ids，不再是“文档暴露但代码无法可靠启动”的状态

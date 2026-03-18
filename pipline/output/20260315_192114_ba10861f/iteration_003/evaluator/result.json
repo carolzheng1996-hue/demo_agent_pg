@@ -1,0 +1,12 @@
+{
+  "selected_strategy": "best_single",
+  "best_single_score": 2.0284254527581274,
+  "ensemble_score": 3.1838734511854865,
+  "iteration_index": 3,
+  "best_score": 2.0284254527581274,
+  "best_previous_score": 2.0284254527581274,
+  "improved": false,
+  "stagnant_rounds": 2,
+  "should_continue": false,
+  "stop_reason": "max_iterations_reached"
+}

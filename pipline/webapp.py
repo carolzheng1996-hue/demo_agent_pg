@@ -14,12 +14,12 @@ from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
 try:
-    from .config import BASE_DIR, OUTPUT_DIR, ensure_directories
+    from .config import BASE_DIR, CONFIG_ALL_FILE, OUTPUT_DIR, build_runtime_state, ensure_directories, runtime_defaults
     from .orchestrator import DGOrchestrator
     from .state import DGGlobalState
     from .task_manager import DGTaskManager
 except ImportError:
-    from config import BASE_DIR, OUTPUT_DIR, ensure_directories
+    from config import BASE_DIR, CONFIG_ALL_FILE, OUTPUT_DIR, build_runtime_state, ensure_directories, runtime_defaults
     from orchestrator import DGOrchestrator
     from state import DGGlobalState
     from task_manager import DGTaskManager
@@ -28,6 +28,7 @@ except ImportError:
 WEB_DIR = BASE_DIR / "web"
 DEFAULT_DATASET_PATH = ""
 JOB_PAYLOAD_FILE = "job_payload.json"
+TASK_PLAN_FILE = "task_plan.json"
 
 
 def _read_json(path: Path) -> Optional[Dict[str, Any]]:
@@ -50,16 +51,6 @@ def _read_text(path: Path) -> Optional[str]:
     return path.read_text(encoding="utf-8")
 
 
-def _summary_without_predictions(payload: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    if not isinstance(payload, dict):
-        return payload
-    summary = dict(payload)
-    if "predictions" in summary:
-        summary["prediction_points"] = len(summary.get("predictions") or [])
-        summary.pop("predictions", None)
-    return summary
-
-
 def _safe_relpath(path: Path, root: Path) -> str:
     try:
         return str(path.relative_to(root))
@@ -67,20 +58,18 @@ def _safe_relpath(path: Path, root: Path) -> str:
         return str(path)
 
 
-def _step_detail(step_dir: Path, root: Path) -> Dict[str, Any]:
-    payload: Dict[str, Any] = {"step_name": step_dir.name, "files": []}
-    result_json = step_dir / "result.json"
-    if result_json.exists():
-        payload["result"] = _read_json(result_json)
-
-    markdown_files = sorted(step_dir.glob("*.md"))
-    if markdown_files:
-        payload["markdown"] = _read_text(markdown_files[0])
-
-    for file_path in sorted(step_dir.iterdir()):
-        if file_path.is_file():
-            payload["files"].append({"name": file_path.name, "relative_path": _safe_relpath(file_path, root)})
-    return payload
+def _list_artifacts(root: Path) -> List[Dict[str, Any]]:
+    if not root.exists():
+        return []
+    return [
+        {
+            "name": path.name,
+            "relative_path": _safe_relpath(path, root.parent),
+            "size_bytes": path.stat().st_size,
+        }
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    ]
 
 
 def load_task_detail(task_id: str) -> Dict[str, Any]:
@@ -93,36 +82,35 @@ def load_task_detail(task_id: str) -> Dict[str, Any]:
     latest_dataset_profile: Dict[str, Any] = {}
     task_type = "unknown"
     requires_modeling = False
+    job_payload = _read_json(task_dir / JOB_PAYLOAD_FILE) or {}
+    task_plan = _read_json(task_dir / TASK_PLAN_FILE) or {}
+    plan_meta = task_plan.get("plan_meta") if isinstance(task_plan.get("plan_meta"), dict) else {}
+    task_type = str(plan_meta.get("task_type") or "unknown")
+    requires_modeling = bool(plan_meta.get("requires_modeling", False))
+    plan = task_plan.get("plan") if isinstance(task_plan.get("plan"), list) else []
 
     for iteration_dir in iteration_dirs:
-        job_payload = _read_json(task_dir / JOB_PAYLOAD_FILE) or {}
-        plan_payload = {
-            "task_type": job_payload.get("query", ""),
-            "plan": [],
-        }
-        task_type = plan_payload.get("task_type") or task_type
-        requires_modeling = requires_modeling or bool(
-            plan_payload.get("task_type") == "forecast_modeling"
-            or any(step in (plan_payload.get("plan") or []) for step in ["model_selection", "model_training", "model_integration", "evaluator"])
-        )
-        steps = []
-
         iterations.append(
             {
                 "iteration_id": iteration_dir.name,
-                "plan": plan_payload,
+                "plan": {"task_type": task_type, "plan": plan},
                 "summary_markdown": _read_text(iteration_dir / "summary.md"),
-                "steps": steps,
+                "steps": [],
+                "artifacts": _list_artifacts(iteration_dir),
             }
         )
 
     final_summary = _read_text(task_dir / "final_summary.md")
-    job_payload = _read_json(task_dir / JOB_PAYLOAD_FILE) or {}
     latest_dataset_profile = {
-        "dataset_path": job_payload.get("dataset_path"),
+        "dataset_path": job_payload.get("dataset_path") or task_plan.get("dataset_path"),
         "target_column": job_payload.get("target_col"),
         "target_columns": [item.strip() for item in str(job_payload.get("target_col", "")).split(",") if item.strip()],
         "available_file_count": len([item.strip() for item in str(job_payload.get("unit", "")).split(",") if item.strip()]) or 0,
+        "selected_units": [item.strip() for item in str(job_payload.get("unit", "")).split(",") if item.strip()],
+        "start_stage": job_payload.get("start_stage") or plan_meta.get("start_stage"),
+        "end_stage": job_payload.get("end_stage") or plan_meta.get("end_stage"),
+        "skip_split": job_payload.get("skip_split"),
+        "data_artifacts": _list_artifacts(task_dir / "data"),
     }
     iteration_history: Dict[str, Any] = {}
     cross_iteration_ensemble = None
@@ -138,6 +126,7 @@ def load_task_detail(task_id: str) -> Dict[str, Any]:
         "iterations": iterations,
         "pending_approval": None,
         "final_summary": final_summary,
+        "plan": {"task_type": task_type, "plan": plan, "plan_meta": plan_meta},
         "iteration_history": iteration_history,
         "cross_iteration_ensemble": cross_iteration_ensemble,
     }
@@ -208,26 +197,8 @@ class DGWebApplication:
         return {
             "query": "针对当前数据集构建一个时序预测模型",
             "dataset_path": str(DEFAULT_DATASET_PATH),
-            "dataset_name": "sample_dataset",
-            "unit": "",
-            "formatter_unit": "",
-            "start_stage": "data_reading",
-            "end_stage": "summary",
-            "skip_split": False,
-            "target_col": "",
-            "input_feature_cols": "",
-            "split_method": "global_last_k",
-            "split_cutoff_date": "",
-            "split_test_units": "",
-            "train_ratio": 0.7,
-            "val_ratio": 0.1,
-            "test_ratio": 0.2,
-            "input_length": 96,
-            "output_length": 24,
-            "time_increment": 1,
-            "normalization_policy": "off",
-            "use_system_random": True,
-            "max_iterations": 3,
+            "config_all": str(CONFIG_ALL_FILE),
+            **runtime_defaults(CONFIG_ALL_FILE),
         }
 
     def submit_job(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -252,27 +223,14 @@ class DGWebApplication:
         stop_event = threading.Event()
         try:
             ensure_directories()
-            initial_state = {
-                "unit": str(payload.get("unit") or "").strip(),
-                "formatter_unit": str(payload.get("formatter_unit") or "").strip(),
-                "start_stage": str(payload.get("start_stage") or "data_reading").strip(),
-                "end_stage": str(payload.get("end_stage") or "summary").strip(),
-                "skip_split": bool(payload.get("skip_split", False)),
-                "target_col": str(payload.get("target_col") or "").strip(),
-                "input_feature_cols": str(payload.get("input_feature_cols") or "").strip(),
-                "split_method": str(payload.get("split_method") or "global_last_k").strip(),
-                "split_cutoff_date": str(payload.get("split_cutoff_date") or "").strip(),
-                "split_test_units": str(payload.get("split_test_units") or "").strip(),
-                "train_ratio": payload.get("train_ratio"),
-                "val_ratio": payload.get("val_ratio"),
-                "test_ratio": payload.get("test_ratio"),
-                "input_length": payload.get("input_length"),
-                "output_length": payload.get("output_length"),
-                "time_increment": payload.get("time_increment"),
-                "normalization_policy": str(payload.get("normalization_policy") or "off"),
-                "use_system_random": bool(payload.get("use_system_random", True)),
-                "max_iterations": int(payload.get("max_iterations", 3)),
-            }
+            config_path = Path(str(payload.get("config_all") or CONFIG_ALL_FILE)).expanduser()
+            initial_state = build_runtime_state(payload, config_path=config_path)
+            initial_state.update(
+                {
+                    "runtime_config_path": str(config_path),
+                    "runtime_config": runtime_defaults(config_path),
+                }
+            )
             state = DGGlobalState(load_existing=False, initial=initial_state)
             task_manager = DGTaskManager()
             orchestrator = DGOrchestrator(state=state, task_manager=task_manager)
@@ -390,30 +348,34 @@ class DGRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"message": str(exc), "traceback": traceback.format_exc()}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
     def _normalize_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        config_path = Path(str(payload.get("config_all") or CONFIG_ALL_FILE)).expanduser()
+        defaults = runtime_defaults(config_path)
         ratios_required = any(payload.get(name) not in (None, "") for name in ("train_ratio", "val_ratio", "test_ratio"))
         normalized = {
+            "config_all": str(config_path),
             "query": str(payload.get("query", "")).strip(),
             "dataset_path": str(payload.get("dataset_path", "")).strip(),
-            "dataset_name": str(payload.get("dataset_name", "custom")).strip() or "custom",
-            "unit": str(payload.get("unit", "")).strip(),
-            "formatter_unit": str(payload.get("formatter_unit", "")).strip(),
-            "start_stage": str(payload.get("start_stage", "data_reading")).strip() or "data_reading",
-            "end_stage": str(payload.get("end_stage", "summary")).strip() or "summary",
-            "skip_split": self._coerce_bool(payload.get("skip_split"), default=False),
-            "target_col": str(payload.get("target_col", "")).strip(),
-            "input_feature_cols": str(payload.get("input_feature_cols", "")).strip(),
-            "split_method": str(payload.get("split_method", "global_last_k")).strip() or "global_last_k",
-            "split_cutoff_date": str(payload.get("split_cutoff_date", "")).strip(),
-            "split_test_units": str(payload.get("split_test_units", "")).strip(),
-            "train_ratio": self._coerce_float(payload.get("train_ratio")) if ratios_required else None,
-            "val_ratio": self._coerce_float(payload.get("val_ratio")) if ratios_required else None,
-            "test_ratio": self._coerce_float(payload.get("test_ratio")) if ratios_required else None,
-            "input_length": self._coerce_int(payload.get("input_length")),
-            "output_length": self._coerce_int(payload.get("output_length")),
-            "time_increment": self._coerce_int(payload.get("time_increment")),
-            "normalization_policy": str(payload.get("normalization_policy", "off")).strip() or "off",
-            "use_system_random": self._coerce_bool(payload.get("use_system_random"), default=True),
-            "max_iterations": int(payload.get("max_iterations") or 3),
+            "dataset_name": str(payload.get("dataset_name", defaults["dataset_name"])).strip() or defaults["dataset_name"],
+            "unit": str(payload.get("unit", defaults["unit"])).strip(),
+            "formatter_unit": str(payload.get("formatter_unit", defaults["formatter_unit"])).strip(),
+            "start_stage": str(payload.get("start_stage", defaults["start_stage"])).strip() or defaults["start_stage"],
+            "end_stage": str(payload.get("end_stage", defaults["end_stage"])).strip() or defaults["end_stage"],
+            "skip_split": self._coerce_bool(payload.get("skip_split"), default=bool(defaults["skip_split"])),
+            "target_col": str(payload.get("target_col", defaults["target_col"])).strip(),
+            "input_feature_cols": str(payload.get("input_feature_cols", defaults["input_feature_cols"])).strip(),
+            "split_method": str(payload.get("split_method", defaults["split_method"])).strip() or defaults["split_method"],
+            "split_cutoff_date": str(payload.get("split_cutoff_date", defaults["split_cutoff_date"])).strip(),
+            "split_test_units": str(payload.get("split_test_units", defaults["split_test_units"])).strip(),
+            "train_ratio": self._coerce_float(payload.get("train_ratio")) if ratios_required else float(defaults["train_ratio"]),
+            "val_ratio": self._coerce_float(payload.get("val_ratio")) if ratios_required else float(defaults["val_ratio"]),
+            "test_ratio": self._coerce_float(payload.get("test_ratio")) if ratios_required else float(defaults["test_ratio"]),
+            "input_length": self._coerce_int(payload.get("input_length")) if payload.get("input_length") not in (None, "") else int(defaults["input_length"]),
+            "output_length": self._coerce_int(payload.get("output_length")) if payload.get("output_length") not in (None, "") else int(defaults["output_length"]),
+            "points_per_day": self._coerce_int(payload.get("points_per_day")) if payload.get("points_per_day") not in (None, "") else int(defaults["points_per_day"]),
+            "time_increment": self._coerce_int(payload.get("time_increment")) if payload.get("time_increment") not in (None, "") else int(defaults["time_increment"]),
+            "normalization_policy": str(payload.get("normalization_policy", defaults["normalization_policy"])).strip() or defaults["normalization_policy"],
+            "use_system_random": self._coerce_bool(payload.get("use_system_random"), default=bool(defaults["use_system_random"])),
+            "max_iterations": int(payload.get("max_iterations") or defaults["max_iterations"]),
         }
         if not normalized["query"]:
             raise ValueError("query is required")

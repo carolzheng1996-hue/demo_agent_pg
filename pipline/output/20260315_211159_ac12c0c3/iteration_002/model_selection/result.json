@@ -1,0 +1,45 @@
+{
+  "models": [
+    {
+      "name": "arima",
+      "params": {
+        "order": [
+          4,
+          1,
+          1
+        ]
+      },
+      "reason": "提供稳定的统计基线。 iteration=2, features=lag_signature,difference_signature,ewm_signature,calendar_signature"
+    },
+    {
+      "name": "xgboost",
+      "params": {
+        "window": 84,
+        "n_estimators": 305,
+        "max_depth": 8,
+        "learning_rate": 0.043000000000000003,
+        "subsample": 0.92,
+        "colsample_bytree": 0.68,
+        "random_seed": 3600
+      },
+      "reason": "适合滑窗和统计特征。 iteration=2, features=lag_signature,difference_signature,ewm_signature,calendar_signature"
+    },
+    {
+      "name": "linear",
+      "params": {
+        "window": 144,
+        "fit_intercept": false
+      },
+      "reason": "提供快速线性基线，便于调试与快速测试。 iteration=2, features=lag_signature,difference_signature,ewm_signature,calendar_signature"
+    }
+  ],
+  "selection_source": "deterministic_rules",
+  "iteration_index": 2,
+  "feature_methods": [
+    "lag_signature",
+    "difference_signature",
+    "ewm_signature",
+    "calendar_signature"
+  ],
+  "history_length": 1
+}

@@ -28,6 +28,21 @@ TIME_DERIVED_COLUMNS = ["date", "hour", "minute"]
 IDENTIFIER_COLUMNS = {"station", "timestamp_win", "__row_id__"}
 
 
+def _sequence_cleanup_config(state: DGGlobalState) -> Dict[str, int]:
+    input_length = state.read("input_length")
+    output_length = state.read("output_length")
+    points_per_day = state.read("points_per_day")
+    if input_length is None or output_length is None:
+        raise ValueError("input_length/output_length is missing in state. Please provide them in config_all.json or runtime args.")
+    if points_per_day is None:
+        raise ValueError("points_per_day is missing in state. Please provide it in config_all.json or runtime args.")
+    return {
+        "input_length": int(input_length),
+        "output_length": int(output_length),
+        "points_per_day": int(points_per_day),
+    }
+
+
 def _ratio_payload(state: DGGlobalState) -> Dict[str, Optional[float]]:
     return {
         "train_ratio": state.read("train_ratio"),
@@ -41,10 +56,12 @@ def _need_split(state: DGGlobalState) -> bool:
 
 
 def _validate_ratios(ratios: Dict[str, Optional[float]]) -> Dict[str, float]:
+    if any(ratios.get(name) is None for name in ["train_ratio", "val_ratio", "test_ratio"]):
+        raise ValueError("train_ratio/val_ratio/test_ratio is missing in state. Please provide them in config_all.json or runtime args.")
     normalized = {
-        "train_ratio": 0.7 if ratios.get("train_ratio") is None else float(ratios["train_ratio"]),
-        "val_ratio": 0.1 if ratios.get("val_ratio") is None else float(ratios["val_ratio"]),
-        "test_ratio": 0.2 if ratios.get("test_ratio") is None else float(ratios["test_ratio"]),
+        "train_ratio": float(ratios["train_ratio"]),
+        "val_ratio": float(ratios["val_ratio"]),
+        "test_ratio": float(ratios["test_ratio"]),
     }
     if any(value < 0 for value in normalized.values()):
         raise ValueError(f"Split ratios must be non-negative, got {normalized}")
@@ -70,6 +87,101 @@ def _extract_sequence_width(series: pd.Series) -> int:
         if isinstance(value, (list, tuple, np.ndarray)):
             max_width = max(max_width, len(value))
     return max_width
+
+
+def _normalize_sequence_value(value: object) -> np.ndarray | None:
+    if value is None:
+        return None
+    if isinstance(value, np.ndarray):
+        return value.astype(float, copy=True).reshape(-1)
+    if isinstance(value, (list, tuple)):
+        return np.asarray(value, dtype=float).reshape(-1)
+    return None
+
+
+def _sequence_length(value: object) -> int:
+    arr = _normalize_sequence_value(value)
+    return int(arr.shape[0]) if arr is not None else 0
+
+
+def _pad_array_head(value: object, target_len: int) -> np.ndarray:
+    arr = _normalize_sequence_value(value)
+    if arr is None:
+        return np.zeros(target_len, dtype=float)
+    if arr.shape[0] >= target_len:
+        return arr[:target_len]
+    return np.pad(arr, (target_len - arr.shape[0], 0), mode="constant")
+
+
+def _pad_array_tail(value: object, target_len: int) -> np.ndarray:
+    arr = _normalize_sequence_value(value)
+    if arr is None:
+        return np.zeros(target_len, dtype=float)
+    if arr.shape[0] >= target_len:
+        return arr[:target_len]
+    return np.pad(arr, (0, target_len - arr.shape[0]), mode="constant")
+
+
+def _fill_nan_sequence(value: object, points_per_day: int) -> np.ndarray:
+    arr = _normalize_sequence_value(value)
+    if arr is None:
+        return np.zeros(0, dtype=float)
+    if arr.size == 0:
+        return arr
+    if np.all(np.isnan(arr)):
+        return np.zeros_like(arr)
+
+    filled = arr.copy()
+    mean_val = float(np.nanmean(filled))
+    for idx in range(filled.shape[0]):
+        if not np.isnan(filled[idx]):
+            continue
+        previous_day_idx = idx - points_per_day
+        if previous_day_idx >= 0 and not np.isnan(filled[previous_day_idx]):
+            filled[idx] = filled[previous_day_idx]
+        else:
+            filled[idx] = mean_val
+    return filled
+
+
+def _sequence_target_length(column: str, config: Dict[str, int]) -> int:
+    if "_predict" in column or "_future" in column:
+        return int(config["output_length"])
+    return int(config["input_length"])
+
+
+def _clean_ds_sequences(df: pd.DataFrame, state: DGGlobalState) -> Tuple[pd.DataFrame, Dict]:
+    config = _sequence_cleanup_config(state)
+    cleaned = df.copy()
+    repaired_columns: List[Dict[str, int | str]] = []
+
+    for column in cleaned.columns:
+        if column in {"station", "timestamp_win"}:
+            continue
+        series = cleaned[column]
+        if _extract_sequence_width(series) <= 0:
+            continue
+
+        target_len = _sequence_target_length(column, config)
+        pad_fn = _pad_array_tail if ("_predict" in column or "_future" in column) else _pad_array_head
+        original_lengths = series.apply(_sequence_length)
+        cleaned[column] = series.apply(lambda value: _fill_nan_sequence(pad_fn(value, target_len), config["points_per_day"]))
+        repaired_columns.append(
+            {
+                "column": column,
+                "target_length": target_len,
+                "min_original_length": int(original_lengths.min()) if len(original_lengths) else 0,
+                "max_original_length": int(original_lengths.max()) if len(original_lengths) else 0,
+            }
+        )
+
+    return cleaned, {
+        "input_length": config["input_length"],
+        "output_length": config["output_length"],
+        "points_per_day": config["points_per_day"],
+        "sequence_columns_checked": len(repaired_columns),
+        "repaired_columns": repaired_columns,
+    }
 
 
 def _flatten_sequence_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -165,8 +277,8 @@ def _prepare_station_dataframe(
     numeric_candidates = [col for col in feature_cols + target_cols if col in working_df.columns]
     for col in numeric_candidates:
         working_df[col] = pd.to_numeric(working_df[col], errors="coerce")
-    working_df = working_df.ffill().bfill().fillna(0.0)
-    working_df["__row_id__"] = np.arange(row_id_start, row_id_start + len(working_df), dtype=int)
+    working_df = working_df.ffill().bfill().fillna(0.0).copy()
+    working_df = working_df.assign(__row_id__=np.arange(row_id_start, row_id_start + len(working_df), dtype=int))
     return working_df
 
 
@@ -211,6 +323,12 @@ def _build_station_payload(
 
 def run(state: DGGlobalState) -> Dict:
     ds_df = _load_ds_dataframe(state)
+    ds_df, cleanup_payload = _clean_ds_sequences(ds_df, state)
+    cleaned_ds_path = write_task_dataframe_artifact(
+        state,
+        "data/data_formatter_ds_cleaned.parquet",
+        ds_df,
+    )
     flat_df = _flatten_sequence_columns(ds_df)
     if "station" not in flat_df.columns:
         raise ValueError("Formatted station-wise output requires a station column in DS data.")
@@ -258,11 +376,12 @@ def run(state: DGGlobalState) -> Dict:
         "raw_dataset_path": dataset_loading_result.get("raw_dataset_path"),
         "ods_dataset_path": dataset_loading_result.get("ods_dataset_path"),
         "ds_dataset_path": dataset_loading_result.get("ds_dataset_path"),
+        "cleaned_ds_dataset_path": str(cleaned_ds_path),
         "formatted_dataset_paths": station_paths,
         "formatted_dataset_path": next(iter(station_paths.values())),
         "unit": dataset_loading_result.get("unit"),
         "selected_units": dataset_loading_result.get("selected_units", []),
-        "split_method": str(state.read("split_method", "global_last_k") or "global_last_k"),
+        "split_method": str(state.read("split_method") or "").strip(),
         "is_directory": True,
         "available_file_count": int(dataset_loading_result.get("available_file_count") or 0),
         "shape": [sum(item["shape"][0] for item in station_profiles.values()), first_profile["shape"][1] if first_profile else 0],
@@ -278,11 +397,14 @@ def run(state: DGGlobalState) -> Dict:
         "sorted_by_time": bool(first_profile and first_profile["date_column"]),
         "station_column_removed": True,
         "station_profiles": station_profiles,
+        "sequence_cleanup": cleanup_payload,
     }
     payload = {
         "dataset_profile": dataset_profile,
         "formatted_dataset_paths": station_paths,
         "station_profiles": station_profiles,
+        "cleaned_ds_dataset_path": str(cleaned_ds_path),
+        "sequence_cleanup": cleanup_payload,
         "pipeline_source": "stationwise_formatter",
     }
 

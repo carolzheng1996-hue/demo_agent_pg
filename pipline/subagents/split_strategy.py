@@ -27,19 +27,27 @@ except ImportError:
     from tools import write_step_artifact, write_task_dataframe_artifact
 
 
-def _default_window_config(state: DGGlobalState) -> Dict:
-    requires_modeling = bool(state.read("plan_meta", {}).get("requires_modeling", False))
-    query = str(state.read("user_query", "")).lower()
-    output_len = 24 if any(keyword in query for keyword in ["24", "day ahead", "one day"]) else 1
+def _window_config(state: DGGlobalState) -> Dict:
+    input_length = state.read("input_length")
+    output_length = state.read("output_length")
+    time_increment = state.read("time_increment")
+    if input_length is None or output_length is None or time_increment is None:
+        raise ValueError("input_length/output_length/time_increment is missing in state. Please provide them in config_all.json or runtime args.")
     return {
-        "input_length": 96 if requires_modeling else None,
-        "output_length": output_len if requires_modeling else None,
-        "time_increment": 1 if requires_modeling else None,
+        "input_length": int(input_length),
+        "output_length": int(output_length),
+        "time_increment": int(time_increment),
     }
 
 
-def _normalized_ratios(profile: Dict) -> Dict[str, float]:
-    ratios = profile.get("split_ratios") or {"train_ratio": 0.7, "val_ratio": 0.1, "test_ratio": 0.2}
+def _normalized_ratios(profile: Dict, state: DGGlobalState) -> Dict[str, float]:
+    ratios = profile.get("split_ratios") or {
+        "train_ratio": state.read("train_ratio"),
+        "val_ratio": state.read("val_ratio"),
+        "test_ratio": state.read("test_ratio"),
+    }
+    if any(ratios.get(key) is None for key in ["train_ratio", "val_ratio", "test_ratio"]):
+        raise ValueError("train_ratio/val_ratio/test_ratio is missing in state. Please provide them in config_all.json or runtime args.")
     normalized = {key: float(ratios[key]) for key in ["train_ratio", "val_ratio", "test_ratio"]}
     if any(value < 0 for value in normalized.values()):
         raise ValueError(f"split ratios must be non-negative, got {normalized}")
@@ -119,16 +127,13 @@ def run(state: DGGlobalState) -> Dict:
     if rows <= 0:
         raise ValueError("split_strategy requires a non-empty formatted dataset.")
 
-    ratios = _normalized_ratios(profile)
-    split_method = str(state.read("split_method", "global_last_k") or "global_last_k")
-    split_cutoff_date = str(state.read("split_cutoff_date", "") or "")
-    split_test_units = [item.strip() for item in str(state.read("split_test_units", "") or "").split(",") if item.strip()]
-    user_window = {
-        "input_length": state.read("input_length"),
-        "output_length": state.read("output_length"),
-        "time_increment": state.read("time_increment"),
-    }
-    window_payload = dict(user_window) if any(value is not None for value in user_window.values()) else _default_window_config(state)
+    ratios = _normalized_ratios(profile, state)
+    split_method = str(state.read("split_method") or "").strip()
+    if not split_method:
+        raise ValueError("split_method is missing in state. Please provide it in config_all.json or runtime args.")
+    split_cutoff_date = str(state.read("split_cutoff_date") or "").strip()
+    split_test_units = [item.strip() for item in str(state.read("split_test_units") or "").split(",") if item.strip()]
+    window_payload = _window_config(state)
 
     train_val_df, test_df = _apply_primary_split(
         dataframe,

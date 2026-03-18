@@ -44,7 +44,9 @@ def _auto_decision(state: DGGlobalState) -> Dict:
 
 
 def run(state: DGGlobalState) -> Dict:
-    policy_override = str(state.read("normalization_policy", "auto") or "auto").lower()
+    policy_override = str(state.read("normalization_policy") or "").lower()
+    if not policy_override:
+        raise ValueError("normalization_policy is missing in state. Please provide it in config_all.json or runtime args.")
     if policy_override in {"off", "skip", "none"}:
         result = {"should_normalize": False, "recommended_mode": "skip", "reason": "user_skip"}
     elif policy_override == "zscore":

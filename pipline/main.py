@@ -2,33 +2,44 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
 try:
-    from .config import DEFAULT_MAX_ITERATIONS, MAX_ITERATIONS_CAP, ensure_directories
+    from .config import (
+        build_runtime_state,
+        CONFIG_ALL_FILE,
+        ensure_directories,
+        runtime_defaults,
+    )
     from .orchestrator import DGOrchestrator
     from .state import DGGlobalState
     from .task_manager import DGTaskManager
 except ImportError:
-    from config import DEFAULT_MAX_ITERATIONS, MAX_ITERATIONS_CAP, ensure_directories
+    from config import build_runtime_state, CONFIG_ALL_FILE, ensure_directories, runtime_defaults
     from orchestrator import DGOrchestrator
     from state import DGGlobalState
     from task_manager import DGTaskManager
 
 
 def parse_args() -> argparse.Namespace:
+    pre_parser = argparse.ArgumentParser(add_help=False)
+    pre_parser.add_argument("--config-all", default=str(CONFIG_ALL_FILE))
+    pre_args, _ = pre_parser.parse_known_args()
+    defaults = runtime_defaults(Path(str(pre_args.config_all)).expanduser())
     parser = argparse.ArgumentParser(description="Deterministic time-series forecasting pipeline")
+    parser.add_argument("--config-all", default=str(CONFIG_ALL_FILE), help="统一运行配置 JSON 路径")
     parser.add_argument("--query", required=True, help="用户任务描述")
     parser.add_argument("--dataset-path", required=True, help="输入按 station=<unit> 分区的目录路径")
-    parser.add_argument("--dataset-name", default="custom", help="数据集名称")
-    parser.add_argument("--unit", default="", help="站点 ID，多个站点用逗号分隔；为空时默认读取目录下全部站点")
+    parser.add_argument("--dataset-name", default=defaults["dataset_name"], help="数据集名称")
+    parser.add_argument("--unit", default=defaults["unit"], help="站点 ID，多个站点用逗号分隔；为空时默认读取目录下全部站点")
     parser.add_argument(
         "--formatter-unit",
-        default="",
+        default=defaults["formatter_unit"],
         help="data_formatter 阶段要处理的站点 ID，多个站点用逗号分隔；为空时默认使用前序阶段全部站点",
     )
     parser.add_argument(
         "--start-stage",
-        default="data_reading",
+        default=defaults["start_stage"],
         choices=[
             "data_reading",
             "data_formatter",
@@ -47,7 +58,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--end-stage",
-        default="summary",
+        default=defaults["end_stage"],
         choices=[
             "data_reading",
             "data_formatter",
@@ -64,32 +75,34 @@ def parse_args() -> argparse.Namespace:
         ],
         help="流程结束阶段",
     )
-    parser.add_argument("--skip-split", action="store_true", help="跳过训练/验证/测试切分")
-    parser.add_argument("--target-col", default="", help="显式指定目标列，多个列用逗号分隔")
-    parser.add_argument("--input-feature-cols", default="", help="显式指定模型输入列，多个列用逗号分隔")
+    parser.add_argument("--skip-split", dest="skip_split", action="store_true", default=bool(defaults["skip_split"]), help="跳过训练/验证/测试切分")
+    parser.add_argument("--enable-split", dest="skip_split", action="store_false", help="启用训练/验证/测试切分")
+    parser.add_argument("--target-col", default=defaults["target_col"], help="显式指定目标列，多个列用逗号分隔")
+    parser.add_argument("--input-feature-cols", default=defaults["input_feature_cols"], help="显式指定模型输入列，多个列用逗号分隔")
     parser.add_argument(
         "--split-method",
-        default="global_last_k",
+        default=defaults["split_method"],
         choices=["station_last_k", "station_month_last_k", "global_last_k", "fixed_date", "leave_stations_out"],
         help="数据集切分方法",
     )
-    parser.add_argument("--split-cutoff-date", default="", help="固定日期切分时使用，格式如 2023-03-01")
-    parser.add_argument("--split-test-units", default="", help="留站切分时使用，多个站点用逗号分隔")
-    parser.add_argument("--train-ratio", type=float, default=None, help="训练集比例")
-    parser.add_argument("--val-ratio", type=float, default=None, help="验证集比例")
-    parser.add_argument("--test-ratio", type=float, default=None, help="测试集比例")
-    parser.add_argument("--input-length", type=int, default=None, help="输入窗口长度")
-    parser.add_argument("--output-length", type=int, default=None, help="输出窗口长度")
-    parser.add_argument("--time-increment", type=int, default=None, help="滑窗步长")
+    parser.add_argument("--split-cutoff-date", default=defaults["split_cutoff_date"], help="固定日期切分时使用，格式如 2023-03-01")
+    parser.add_argument("--split-test-units", default=defaults["split_test_units"], help="留站切分时使用，多个站点用逗号分隔")
+    parser.add_argument("--train-ratio", type=float, default=defaults["train_ratio"], help="训练集比例")
+    parser.add_argument("--val-ratio", type=float, default=defaults["val_ratio"], help="验证集比例")
+    parser.add_argument("--test-ratio", type=float, default=defaults["test_ratio"], help="测试集比例")
+    parser.add_argument("--input-length", type=int, default=defaults["input_length"], help="输入窗口长度")
+    parser.add_argument("--output-length", type=int, default=defaults["output_length"], help="输出窗口长度")
+    parser.add_argument("--points-per-day", type=int, default=defaults["points_per_day"], help="每天的采样点数，用于 DS 序列缺失填补")
+    parser.add_argument("--time-increment", type=int, default=defaults["time_increment"], help="滑窗步长")
     parser.add_argument(
         "--normalization-policy",
         choices=["auto", "off", "zscore", "minmax"],
-        default="auto",
+        default=defaults["normalization_policy"],
         help="标准化策略：自动判断/关闭/zscore/minmax",
     )
-    parser.add_argument("--use-system-random", dest="use_system_random", action="store_true", default=True, help="特征工程迭代时使用 SystemRandom 随机选择策略")
+    parser.add_argument("--use-system-random", dest="use_system_random", action="store_true", default=bool(defaults["use_system_random"]), help="特征工程迭代时使用 SystemRandom 随机选择策略")
     parser.add_argument("--disable-system-random", dest="use_system_random", action="store_false", help="关闭 SystemRandom，改为确定性种子策略")
-    parser.add_argument("--max-iterations", type=int, default=DEFAULT_MAX_ITERATIONS, help="自动优化最大轮数，最大不超过10")
+    parser.add_argument("--max-iterations", type=int, default=defaults["max_iterations"], help="自动优化最大轮数，最大不超过10")
     parser.add_argument("--print-state", action="store_true", help="打印完整 state")
     return parser.parse_args()
 
@@ -97,29 +110,42 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     ensure_directories()
-    state = DGGlobalState(
-        load_existing=False,
-        initial={
-            "unit": str(args.unit or "").strip(),
-            "formatter_unit": str(args.formatter_unit or "").strip(),
-            "start_stage": str(args.start_stage or "data_reading").strip(),
-            "end_stage": str(args.end_stage or "summary").strip(),
-            "skip_split": bool(args.skip_split),
-            "target_col": str(args.target_col or "").strip(),
-            "input_feature_cols": str(args.input_feature_cols or "").strip(),
-            "split_method": str(args.split_method or "global_last_k").strip(),
-            "split_cutoff_date": str(args.split_cutoff_date or "").strip(),
-            "split_test_units": str(args.split_test_units or "").strip(),
+    config_path = Path(str(args.config_all)).expanduser()
+    initial_state = build_runtime_state(
+        {
+            "dataset_name": args.dataset_name,
+            "unit": args.unit,
+            "formatter_unit": args.formatter_unit,
+            "start_stage": args.start_stage,
+            "end_stage": args.end_stage,
+            "skip_split": args.skip_split,
+            "target_col": args.target_col,
+            "input_feature_cols": args.input_feature_cols,
+            "split_method": args.split_method,
+            "split_cutoff_date": args.split_cutoff_date,
+            "split_test_units": args.split_test_units,
             "train_ratio": args.train_ratio,
             "val_ratio": args.val_ratio,
             "test_ratio": args.test_ratio,
             "input_length": args.input_length,
             "output_length": args.output_length,
+            "points_per_day": args.points_per_day,
             "time_increment": args.time_increment,
             "normalization_policy": args.normalization_policy,
-            "use_system_random": bool(args.use_system_random),
-            "max_iterations": max(1, min(int(args.max_iterations), MAX_ITERATIONS_CAP)),
+            "use_system_random": args.use_system_random,
+            "max_iterations": args.max_iterations,
         },
+        config_path=config_path,
+    )
+    initial_state.update(
+        {
+            "runtime_config_path": str(config_path),
+            "runtime_config": runtime_defaults(config_path),
+        }
+    )
+    state = DGGlobalState(
+        load_existing=False,
+        initial=initial_state,
     )
     task_manager = DGTaskManager()
     orchestrator = DGOrchestrator(state=state, task_manager=task_manager)

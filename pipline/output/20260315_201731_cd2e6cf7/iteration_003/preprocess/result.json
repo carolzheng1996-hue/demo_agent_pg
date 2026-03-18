@@ -1,0 +1,34 @@
+{
+  "numeric_columns": [
+    "HULL",
+    "hour",
+    "minute",
+    "OT",
+    "HULL_lag_1",
+    "HULL_lag_6",
+    "HULL_lag_12",
+    "HULL_lag_24",
+    "OT_lag_1",
+    "OT_lag_6",
+    "OT_lag_12",
+    "OT_lag_24",
+    "dayofweek",
+    "day",
+    "month",
+    "is_weekend",
+    "HULL_abs_energy_24",
+    "HULL_peak_count_24",
+    "HULL_turning_points_24",
+    "OT_abs_energy_24",
+    "OT_peak_count_24",
+    "OT_turning_points_24"
+  ],
+  "scaling": {},
+  "normalization_applied": false,
+  "normalization_mode": "skip",
+  "preprocessed_shape": [
+    17420,
+    23
+  ],
+  "used_partial_fit": false
+}

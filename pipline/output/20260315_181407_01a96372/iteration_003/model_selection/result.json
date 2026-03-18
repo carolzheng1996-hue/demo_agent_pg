@@ -1,0 +1,50 @@
+{
+  "models": [
+    {
+      "name": "arima",
+      "params": {
+        "order": [
+          4,
+          0,
+          1
+        ]
+      },
+      "reason": "提供稳定的统计基线。 iteration=3, features=lag_signature,difference_signature,peak_signature"
+    },
+    {
+      "name": "xgboost",
+      "params": {
+        "window": 96,
+        "n_estimators": 360,
+        "max_depth": 7,
+        "learning_rate": 0.04,
+        "subsample": 0.7,
+        "colsample_bytree": 0.68,
+        "random_seed": 4792
+      },
+      "reason": "适合滑窗和统计特征。 iteration=3, features=lag_signature,difference_signature,peak_signature"
+    },
+    {
+      "name": "lstm",
+      "params": {
+        "seq_len": 132,
+        "hidden_size": 80,
+        "num_layers": 2,
+        "dropout": 0.25,
+        "epochs": 13,
+        "lr": 0.0007999999999999999,
+        "batch_size": 48,
+        "random_seed": 4466
+      },
+      "reason": "适合中长依赖序列建模。 iteration=3, features=lag_signature,difference_signature,peak_signature"
+    }
+  ],
+  "selection_source": "deterministic_rules",
+  "iteration_index": 3,
+  "feature_methods": [
+    "lag_signature",
+    "difference_signature",
+    "peak_signature"
+  ],
+  "history_length": 2
+}

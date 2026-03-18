@@ -1,0 +1,66 @@
+{
+  "selected_methods": [
+    "calendar_signature",
+    "peak_signature",
+    "ewm_signature",
+    "lag_signature"
+  ],
+  "engineered_columns": [
+    "hour",
+    "dayofweek",
+    "day",
+    "month",
+    "is_weekend",
+    "HULL_abs_energy_24",
+    "HULL_peak_count_24",
+    "HULL_turning_points_24",
+    "HUFL_abs_energy_24",
+    "HUFL_peak_count_24",
+    "HUFL_turning_points_24",
+    "OT_abs_energy_24",
+    "OT_peak_count_24",
+    "OT_turning_points_24",
+    "HULL_ewm_mean_12",
+    "HULL_ewm_mean_24",
+    "HULL_ewm_std_24",
+    "HUFL_ewm_mean_12",
+    "HUFL_ewm_mean_24",
+    "HUFL_ewm_std_24",
+    "OT_ewm_mean_12",
+    "OT_ewm_mean_24",
+    "OT_ewm_std_24",
+    "HULL_lag_1",
+    "HULL_lag_6",
+    "HULL_lag_12",
+    "HULL_lag_24",
+    "HUFL_lag_1",
+    "HUFL_lag_6",
+    "HUFL_lag_12",
+    "HUFL_lag_24",
+    "OT_lag_1",
+    "OT_lag_6",
+    "OT_lag_12",
+    "OT_lag_24"
+  ],
+  "source_columns": [
+    "HULL",
+    "HUFL",
+    "OT"
+  ],
+  "engineered_feature_count": 35,
+  "shape": [
+    17420,
+    40
+  ],
+  "iteration_index": 2,
+  "random_mode": "deterministic_seeded",
+  "strategy_seed_basis": "deterministic:20260315_204306_c524e199:2:1",
+  "tsfresh_inspired_notes": {
+    "lag_signature": "多阶滞后特征",
+    "rolling_signature": "滚动统计量特征",
+    "difference_signature": "差分与变化率特征",
+    "ewm_signature": "指数加权统计特征",
+    "peak_signature": "局部峰值/能量/转折点特征",
+    "calendar_signature": "时间日历特征"
+  }
+}

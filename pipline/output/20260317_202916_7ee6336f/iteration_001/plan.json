@@ -1,0 +1,18 @@
+{
+  "task_id": "20260317_202916_7ee6336f",
+  "iteration_id": "iteration_001",
+  "iteration_index": 1,
+  "plan": [
+    "data_reading",
+    "data_formatter",
+    "data_analysis",
+    "feature_engineering",
+    "split_strategy",
+    "datanorm",
+    "preprocess",
+    "model_selection",
+    "model_training"
+  ],
+  "user_query": "构建一个时序预测模型",
+  "task_type": "forecast_modeling"
+}

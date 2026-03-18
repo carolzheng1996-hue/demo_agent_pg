@@ -1,0 +1,42 @@
+{
+  "numeric_columns": [
+    "HULL",
+    "HUFL",
+    "hour",
+    "minute",
+    "OT",
+    "HULL_lag_1",
+    "HULL_lag_6",
+    "HULL_lag_12",
+    "HULL_lag_24",
+    "HUFL_lag_1",
+    "HUFL_lag_6",
+    "HUFL_lag_12",
+    "HUFL_lag_24",
+    "OT_lag_1",
+    "OT_lag_6",
+    "OT_lag_12",
+    "OT_lag_24",
+    "HULL_ewm_mean_12",
+    "HULL_ewm_mean_24",
+    "HULL_ewm_std_24",
+    "HUFL_ewm_mean_12",
+    "HUFL_ewm_mean_24",
+    "HUFL_ewm_std_24",
+    "OT_ewm_mean_12",
+    "OT_ewm_mean_24",
+    "OT_ewm_std_24",
+    "dayofweek",
+    "day",
+    "month",
+    "is_weekend"
+  ],
+  "scaling": {},
+  "normalization_applied": false,
+  "normalization_mode": "skip",
+  "preprocessed_shape": [
+    17420,
+    31
+  ],
+  "used_partial_fit": false
+}

@@ -82,6 +82,11 @@ def _build_ods_to_ds_config(
     state: DGGlobalState,
     targets: Sequence[str],
 ) -> Dict[str, Any]:
+    input_length = state.read("input_length")
+    output_length = state.read("output_length")
+    if input_length is None or output_length is None:
+        raise ValueError("input_length/output_length is missing in state. Please provide them in config_all.json or runtime args.")
+
     input_columns = _resolve_input_columns(ods_df, targets, state)
     history_columns = [column for column in input_columns if not str(column).endswith("_predict")]
     predict_columns = [column for column in input_columns if str(column).endswith("_predict")]
@@ -94,8 +99,8 @@ def _build_ods_to_ds_config(
         "col_ls": history_columns,
         "pred_col_ls": predict_columns,
         "targ_col_ls": [column for column in targets if column in ods_df.columns],
-        "hist_win_size": int(state.read("input_length") or 96),
-        "forcast_win_size": int(state.read("output_length") or 1),
+        "hist_win_size": int(input_length),
+        "forcast_win_size": int(output_length),
     }
 
 

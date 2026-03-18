@@ -142,7 +142,7 @@ FEATURE_METHOD_POOL: Dict[str, FeatureMethod] = {
 
 
 def _feature_rng(state: DGGlobalState, iteration_index: int) -> random.Random:
-    use_system_random = bool(state.read("use_system_random", True))
+    use_system_random = bool(state.read("use_system_random"))
     if use_system_random:
         return random.SystemRandom()
 
@@ -251,10 +251,10 @@ def run(state: DGGlobalState) -> Dict:
         "shape": [total_rows, total_cols],
         "station_count": len(engineered_paths),
         "iteration_index": iteration_index,
-        "random_mode": "system_random" if bool(state.read("use_system_random", True)) else "deterministic_seeded",
+        "random_mode": "system_random" if bool(state.read("use_system_random")) else "deterministic_seeded",
         "strategy_seed_basis": (
             f"system_random:{iteration_index}:{int(time.time() * 1000)}"
-            if bool(state.read("use_system_random", True))
+            if bool(state.read("use_system_random"))
             else f"deterministic:{state.read('task_id', 'default_task')}:{iteration_index}:{len(state.read('iteration_history', []) or [])}"
         ),
         "tsfresh_inspired_notes": {

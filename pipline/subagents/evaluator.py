@@ -5,11 +5,9 @@ from typing import Dict
 import numpy as np
 
 try:
-    from ..config import DEFAULT_MAX_ITERATIONS
     from ..state import DGGlobalState
     from ..tools import evaluate_iteration, write_step_artifact
 except ImportError:
-    from config import DEFAULT_MAX_ITERATIONS
     from state import DGGlobalState
     from tools import evaluate_iteration, write_step_artifact
 
@@ -24,6 +22,9 @@ def run(state: DGGlobalState) -> Dict:
     chosen = "ensemble" if ensemble_score <= best_single_score else "best_single"
     best_score = min(best_single_score, ensemble_score)
     iteration_index = int(state.read("current_iteration_index", 1))
+    max_iterations = state.read("max_iterations")
+    if max_iterations is None:
+        raise ValueError("max_iterations is missing in state. Please provide it in config_all.json or runtime args.")
 
     history = state.read("iteration_history", [])
     evaluation = evaluate_iteration(
@@ -35,7 +36,7 @@ def run(state: DGGlobalState) -> Dict:
         },
         history=history,
         iteration_index=iteration_index,
-        max_iterations=int(state.read("max_iterations", DEFAULT_MAX_ITERATIONS)),
+        max_iterations=int(max_iterations),
     )
     chosen_result = integration if chosen == "ensemble" else best_model
     predictions = np.asarray(chosen_result.get("predictions", []), dtype=float)

@@ -1,0 +1,33 @@
+{
+  "selected_methods": [
+    "lag_signature",
+    "peak_signature",
+    "ewm_signature"
+  ],
+  "engineered_columns": [
+    "OT_lag_1",
+    "OT_lag_6",
+    "OT_lag_12",
+    "OT_lag_24",
+    "OT_abs_energy_24",
+    "OT_peak_count_24",
+    "OT_turning_points_24",
+    "OT_ewm_mean_12",
+    "OT_ewm_mean_24",
+    "OT_ewm_std_24"
+  ],
+  "shape": [
+    17420,
+    18
+  ],
+  "iteration_index": 1,
+  "strategy_seed_basis": "20260315_173806_9374ca22:1",
+  "tsfresh_inspired_notes": {
+    "lag_signature": "多阶滞后特征",
+    "rolling_signature": "滚动统计量特征",
+    "difference_signature": "差分与变化率特征",
+    "ewm_signature": "指数加权统计特征",
+    "peak_signature": "局部峰值/能量/转折点特征",
+    "calendar_signature": "时间日历特征"
+  }
+}

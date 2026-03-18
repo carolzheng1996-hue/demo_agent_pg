@@ -1,0 +1,16 @@
+{
+  "query": "针对当前数据集构建一个时序预测模型",
+  "dataset_path": "/Users/monychen/Documents/demo-zjl/data/ETTh1.csv",
+  "dataset_name": "sample_dataset",
+  "target_col": "OT",
+  "train_ratio": 0.7,
+  "val_ratio": 0.1,
+  "test_ratio": 0.2,
+  "use_custom_processing": false,
+  "custom_processing_steps": "",
+  "input_length": 96,
+  "output_length": 24,
+  "time_increment": 1,
+  "normalization_policy": "off",
+  "max_iterations": 3
+}

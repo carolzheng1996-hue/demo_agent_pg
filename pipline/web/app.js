@@ -14,6 +14,23 @@ const state = {
   lastTaskDetailSignature: "",
 };
 
+const STAGE_ORDER = [
+  "data_reading",
+  "data_formatter",
+  "data_analysis",
+  "feature_engineering",
+  "split_strategy",
+  "datanorm",
+  "preprocess",
+  "model_selection",
+  "model_training",
+  "model_integration",
+  "evaluator",
+  "summary",
+];
+
+const MODEL_STAGES = new Set(["model_selection", "model_training", "model_integration", "evaluator"]);
+
 // Centralizing DOM lookups here keeps the rest of the file focused on state transitions
 // and rendering logic instead of repeated `getElementById` calls.
 const elements = {
@@ -46,6 +63,10 @@ function bindEvents() {
   elements.loadDefaultsButton.addEventListener("click", () => fillForm(state.defaults));
   elements.refreshTasksButton.addEventListener("click", refreshTasks);
   elements.taskSearchInput.addEventListener("input", onTaskSearch);
+  ["query", "start_stage", "end_stage", "split_method", "skip_split"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("input", syncFormVisibility);
+    document.getElementById(id)?.addEventListener("change", syncFormVisibility);
+  });
 }
 
 // `/api/config` returns backend-provided defaults so CLI and Web UI share one source of truth.
@@ -68,6 +89,7 @@ function fillForm(defaults) {
       field.value = value ?? "";
     }
   }
+  syncFormVisibility();
 }
 
 // Form submission only enqueues a backend job.
@@ -97,6 +119,58 @@ async function onSubmitJob(event) {
 function formToPayload() {
   const formData = new FormData(elements.jobForm);
   return Object.fromEntries(formData.entries());
+}
+
+function inferIntent(query) {
+  const text = String(query || "").toLowerCase();
+  const forecastKw = ["预测", "建模", "训练", "forecast", "model", "train"];
+  const processingKw = ["处理", "预处理", "清洗", "格式化", "切分", "特征工程", "ods", "ds", "split", "preprocess", "feature"];
+  const analysisKw = ["统计", "分析", "概览", "distribution", "analysis", "summary"];
+  if (forecastKw.some((item) => text.includes(item))) return "forecast_modeling";
+  if (processingKw.some((item) => text.includes(item))) return "data_processing";
+  if (analysisKw.some((item) => text.includes(item))) return "analysis_only";
+  return "forecast_modeling";
+}
+
+function stageRange(startStage, endStage) {
+  const start = STAGE_ORDER.indexOf(startStage);
+  const end = STAGE_ORDER.indexOf(endStage);
+  if (start === -1 || end === -1 || start > end) return [];
+  return STAGE_ORDER.slice(start, end + 1);
+}
+
+function toggleField(fieldId, visible) {
+  const field = document.getElementById(fieldId);
+  const label = field?.closest("label");
+  if (!field || !label) return;
+  label.style.display = visible ? "" : "none";
+  field.disabled = !visible;
+}
+
+function syncFormVisibility() {
+  const query = document.getElementById("query")?.value || "";
+  const startStage = document.getElementById("start_stage")?.value || "data_reading";
+  const endStage = document.getElementById("end_stage")?.value || "summary";
+  const splitMethod = document.getElementById("split_method")?.value || "global_last_k";
+  const skipSplit = (document.getElementById("skip_split")?.value || "false") === "true";
+  const intent = inferIntent(query);
+  const activeStages = stageRange(startStage, endStage);
+  const includesSplit = activeStages.includes("split_strategy") && !skipSplit;
+  const includesFeature = activeStages.includes("feature_engineering");
+  const includesDsCleanup = activeStages.includes("data_reading") || activeStages.includes("data_formatter");
+  const includesModel = activeStages.some((stage) => MODEL_STAGES.has(stage)) || (intent === "forecast_modeling" && endStage === "summary");
+
+  toggleField("formatter_unit", startStage === "data_formatter");
+  toggleField("train_ratio", includesSplit);
+  toggleField("val_ratio", includesSplit);
+  toggleField("test_ratio", includesSplit);
+  toggleField("split_method", includesSplit);
+  toggleField("split_cutoff_date", includesSplit && splitMethod === "fixed_date");
+  toggleField("split_test_units", includesSplit && splitMethod === "leave_stations_out");
+  toggleField("skip_split", activeStages.includes("split_strategy") || includesModel);
+  toggleField("max_iterations", includesModel);
+  toggleField("points_per_day", includesDsCleanup);
+  toggleField("use_system_random", includesFeature);
 }
 
 // Poll the job endpoint until the task either completes or fails.
@@ -320,10 +394,7 @@ function renderStatsPanel(detail) {
   );
 
   if (!statsSteps.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-    empty.textContent = "统计特性分析尚未完成。";
-    panel.appendChild(empty);
+    panel.appendChild(renderSummaryOnlyStats(detail));
     return panel;
   }
 
@@ -332,6 +403,50 @@ function renderStatsPanel(detail) {
   statsGrid.appendChild(renderStatsSummaryCards(stepMap));
   panel.appendChild(statsGrid);
   return panel;
+}
+
+function renderSummaryOnlyStats(detail) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "report-card-grid";
+
+  const profile = detail.dataset_profile || {};
+  const overview = buildSummarySection("任务概览", [
+    { label: "数据集路径", value: profile.dataset_path || "—" },
+    { label: "目标列", value: formatTargetColumns(profile) || "—" },
+    { label: "站点", value: (profile.selected_units || []).join(", ") || "—" },
+    { label: "起始阶段", value: profile.start_stage || detail.plan?.plan_meta?.start_stage || "—" },
+    { label: "结束阶段", value: profile.end_stage || detail.plan?.plan_meta?.end_stage || "—" },
+    { label: "是否跳过切分", value: formatBooleanDisplay(profile.skip_split) },
+  ]);
+  wrapper.appendChild(renderSummarySection(overview));
+
+  if ((profile.data_artifacts || []).length) {
+    wrapper.appendChild(
+      renderSummarySection(
+        buildSummarySection(
+          "任务级数据产物",
+          profile.data_artifacts.map((item) => ({
+            label: item.name,
+            value: item.relative_path || item.name,
+          })),
+        ),
+      ),
+    );
+  }
+
+  const summaryText =
+    detail.iterations.find((iteration) => iteration.summary_markdown)?.summary_markdown ||
+    detail.final_summary ||
+    "";
+  if (summaryText) {
+    wrapper.appendChild(renderTextSummarySection("任务总结", summaryText));
+  } else {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "当前任务尚未生成可展示的阶段摘要。";
+    wrapper.appendChild(empty);
+  }
+  return wrapper;
 }
 
 // Hero cards surface the fastest-to-read dataset signals so users do not need to inspect raw JSON.
@@ -584,10 +699,18 @@ function renderModelIterationsPanel(detail) {
   });
 
   if (!iterationList.children.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-    empty.textContent = "模型训练等 subagent 尚未开始执行。";
-    panel.appendChild(empty);
+    const summaryText =
+      detail.iterations.find((iteration) => iteration.summary_markdown)?.summary_markdown ||
+      detail.final_summary ||
+      "";
+    if (summaryText) {
+      panel.appendChild(renderTextSummarySection("建模总结", summaryText));
+    } else {
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.textContent = "模型训练等 subagent 尚未开始执行。";
+      panel.appendChild(empty);
+    }
     return panel;
   }
 

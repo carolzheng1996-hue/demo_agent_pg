@@ -1,0 +1,56 @@
+{
+  "selected_methods": [
+    "lag_signature",
+    "ewm_signature",
+    "calendar_signature"
+  ],
+  "engineered_columns": [
+    "HULL_lag_1",
+    "HULL_lag_6",
+    "HULL_lag_12",
+    "HULL_lag_24",
+    "HUFL_lag_1",
+    "HUFL_lag_6",
+    "HUFL_lag_12",
+    "HUFL_lag_24",
+    "OT_lag_1",
+    "OT_lag_6",
+    "OT_lag_12",
+    "OT_lag_24",
+    "HULL_ewm_mean_12",
+    "HULL_ewm_mean_24",
+    "HULL_ewm_std_24",
+    "HUFL_ewm_mean_12",
+    "HUFL_ewm_mean_24",
+    "HUFL_ewm_std_24",
+    "OT_ewm_mean_12",
+    "OT_ewm_mean_24",
+    "OT_ewm_std_24",
+    "hour",
+    "dayofweek",
+    "day",
+    "month",
+    "is_weekend"
+  ],
+  "source_columns": [
+    "HULL",
+    "HUFL",
+    "OT"
+  ],
+  "engineered_feature_count": 26,
+  "shape": [
+    17420,
+    31
+  ],
+  "iteration_index": 3,
+  "random_mode": "system_random",
+  "strategy_seed_basis": "system_random:3:1773579177447",
+  "tsfresh_inspired_notes": {
+    "lag_signature": "多阶滞后特征",
+    "rolling_signature": "滚动统计量特征",
+    "difference_signature": "差分与变化率特征",
+    "ewm_signature": "指数加权统计特征",
+    "peak_signature": "局部峰值/能量/转折点特征",
+    "calendar_signature": "时间日历特征"
+  }
+}

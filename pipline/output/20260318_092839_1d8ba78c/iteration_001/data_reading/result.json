@@ -1,0 +1,89 @@
+{
+  "dataset_path": "/Users/monychen/Documents/demo-zjl/pipline/sample_station_data",
+  "unit": "",
+  "selected_units": [
+    "1",
+    "2",
+    "3"
+  ],
+  "available_units": [
+    "1",
+    "2",
+    "3"
+  ],
+  "available_file_count": 3,
+  "is_directory": true,
+  "raw_dataset_path": "/Users/monychen/Documents/demo-zjl/pipline/sample_station_data",
+  "ods_dataset_path": "/Users/monychen/Documents/demo-zjl/pipline/output/20260318_092839_1d8ba78c/iteration_001/data_reading/ods_dataset.parquet",
+  "ds_dataset_path": "/Users/monychen/Documents/demo-zjl/pipline/output/20260318_092839_1d8ba78c/iteration_001/data_reading/ds_dataset.parquet",
+  "description": "已读取 3 个站点的原始数据，并完成 ODS -> DS 转换。 ODS 形状为 1152 x 25，DS 形状为 1152 x 24。",
+  "ods_shape": [
+    1152,
+    25
+  ],
+  "ds_shape": [
+    1152,
+    24
+  ],
+  "columns": [
+    "station",
+    "timestamp_win",
+    "observe_power",
+    "GHI_real",
+    "GHI_SOLARGIS",
+    "TEMP_SOLARGIS",
+    "WS_SOLARGIS",
+    "WD_SOLARGIS",
+    "ssrd_pos_1",
+    "t2m_pos_1",
+    "ssrd_pos_2",
+    "t2m_pos_2",
+    "ssrd_pos_3",
+    "t2m_pos_3",
+    "TEMP_SOLARGIS_predict",
+    "WS_SOLARGIS_predict",
+    "WD_SOLARGIS_predict",
+    "ssrd_pos_1_predict",
+    "t2m_pos_1_predict",
+    "ssrd_pos_2_predict",
+    "t2m_pos_2_predict",
+    "ssrd_pos_3_predict",
+    "t2m_pos_3_predict",
+    "GHI_SOLARGIS_predict_future"
+  ],
+  "ods_to_ds_config": {
+    "col_ls": [
+      "observe_power",
+      "GHI_real",
+      "GHI_SOLARGIS",
+      "TEMP_SOLARGIS",
+      "WS_SOLARGIS",
+      "WD_SOLARGIS",
+      "ssrd_pos_1",
+      "t2m_pos_1",
+      "ssrd_pos_2",
+      "t2m_pos_2",
+      "ssrd_pos_3",
+      "t2m_pos_3"
+    ],
+    "pred_col_ls": [
+      "TEMP_SOLARGIS_predict",
+      "WS_SOLARGIS_predict",
+      "WD_SOLARGIS_predict",
+      "ssrd_pos_1_predict",
+      "t2m_pos_1_predict",
+      "ssrd_pos_2_predict",
+      "t2m_pos_2_predict",
+      "ssrd_pos_3_predict",
+      "t2m_pos_3_predict"
+    ],
+    "targ_col_ls": [
+      "GHI_SOLARGIS_predict"
+    ],
+    "hist_win_size": 96,
+    "forcast_win_size": 1
+  },
+  "target_columns": [
+    "GHI_SOLARGIS_predict"
+  ]
+}
