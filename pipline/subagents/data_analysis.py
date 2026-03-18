@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Dict, List
 
 import pandas as pd
@@ -72,11 +73,22 @@ def _build_input_statistics_text(df, analysis: Dict) -> str:
 
 
 def run(state: DGGlobalState) -> Dict:
-    df = state.read_runtime("raw_df")
-    if df is None:
-        raise RuntimeError("Missing raw dataframe in runtime state. Run data_reading first.")
+    profile = state.read("dataset_profile", {})
+    station_paths = profile.get("formatted_dataset_paths") or {}
+    if station_paths:
+        frames = []
+        for station_id, formatted_path in station_paths.items():
+            frame = pd.read_parquet(Path(str(formatted_path)))
+            frame["__station_id__"] = str(station_id)
+            frames.append(frame)
+        df = pd.concat(frames, axis=0, ignore_index=True)
+    else:
+        formatted_path = profile.get("formatted_dataset_path")
+        if not formatted_path:
+            raise RuntimeError("Missing formatted dataset path. Run data_formatter first.")
+        df = pd.read_parquet(Path(str(formatted_path)))
 
-    target_col = state.read("dataset_profile", {}).get("target_column")
+    target_col = profile.get("target_column")
     analysis = compute_full_analysis(df, target_col)
     analysis_payload = {
         "base_analysis": analysis,

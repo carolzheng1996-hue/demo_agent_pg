@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Callable, Dict, List
 
 try:
@@ -15,16 +16,26 @@ SubagentFunc = Callable[[DGGlobalState], Dict]
 def run_subagent(name: str, fn: SubagentFunc, state: DGGlobalState, task_manager: DGTaskManager) -> Dict:
     task_manager.start(name)
     state.write("tasks", task_manager.list_tasks())
+    iteration_index = int(state.read("current_iteration_index", 1) or 1)
+    print(f"[{datetime.now().isoformat(timespec='seconds')}] iteration={iteration_index} step={name} start", flush=True)
     try:
         result = fn(state)
         detail = result.get("message", "ok") if isinstance(result, dict) else "ok"
         task_manager.complete(name, detail=detail)
         state.write("tasks", task_manager.list_tasks())
+        print(
+            f"[{datetime.now().isoformat(timespec='seconds')}] iteration={iteration_index} step={name} done: {detail}",
+            flush=True,
+        )
         return result if isinstance(result, dict) else {}
     except Exception as exc:
         task_manager.fail(name, detail=str(exc))
         state.write("tasks", task_manager.list_tasks())
         state.write("error", {"subagent": name, "message": str(exc)})
+        print(
+            f"[{datetime.now().isoformat(timespec='seconds')}] iteration={iteration_index} step={name} failed: {exc}",
+            flush=True,
+        )
         raise
 
 

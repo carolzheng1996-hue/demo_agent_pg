@@ -18,10 +18,63 @@ except ImportError:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Deterministic time-series forecasting pipeline")
     parser.add_argument("--query", required=True, help="用户任务描述")
-    parser.add_argument("--dataset-path", required=True, help="输入数据文件或目录路径，支持 csv/pkl/npy/parquet")
+    parser.add_argument("--dataset-path", required=True, help="输入按 station=<unit> 分区的目录路径")
     parser.add_argument("--dataset-name", default="custom", help="数据集名称")
+    parser.add_argument("--unit", default="", help="站点 ID，多个站点用逗号分隔；为空时默认读取目录下全部站点")
+    parser.add_argument(
+        "--formatter-unit",
+        default="",
+        help="data_formatter 阶段要处理的站点 ID，多个站点用逗号分隔；为空时默认使用前序阶段全部站点",
+    )
+    parser.add_argument(
+        "--start-stage",
+        default="data_reading",
+        choices=[
+            "data_reading",
+            "data_formatter",
+            "data_analysis",
+            "feature_engineering",
+            "split_strategy",
+            "datanorm",
+            "preprocess",
+            "model_selection",
+            "model_training",
+            "model_integration",
+            "evaluator",
+            "summary",
+        ],
+        help="流程起始阶段",
+    )
+    parser.add_argument(
+        "--end-stage",
+        default="summary",
+        choices=[
+            "data_reading",
+            "data_formatter",
+            "data_analysis",
+            "feature_engineering",
+            "split_strategy",
+            "datanorm",
+            "preprocess",
+            "model_selection",
+            "model_training",
+            "model_integration",
+            "evaluator",
+            "summary",
+        ],
+        help="流程结束阶段",
+    )
+    parser.add_argument("--skip-split", action="store_true", help="跳过训练/验证/测试切分")
     parser.add_argument("--target-col", default="", help="显式指定目标列，多个列用逗号分隔")
     parser.add_argument("--input-feature-cols", default="", help="显式指定模型输入列，多个列用逗号分隔")
+    parser.add_argument(
+        "--split-method",
+        default="global_last_k",
+        choices=["station_last_k", "station_month_last_k", "global_last_k", "fixed_date", "leave_stations_out"],
+        help="数据集切分方法",
+    )
+    parser.add_argument("--split-cutoff-date", default="", help="固定日期切分时使用，格式如 2023-03-01")
+    parser.add_argument("--split-test-units", default="", help="留站切分时使用，多个站点用逗号分隔")
     parser.add_argument("--train-ratio", type=float, default=None, help="训练集比例")
     parser.add_argument("--val-ratio", type=float, default=None, help="验证集比例")
     parser.add_argument("--test-ratio", type=float, default=None, help="测试集比例")
@@ -47,8 +100,16 @@ def main() -> None:
     state = DGGlobalState(
         load_existing=False,
         initial={
+            "unit": str(args.unit or "").strip(),
+            "formatter_unit": str(args.formatter_unit or "").strip(),
+            "start_stage": str(args.start_stage or "data_reading").strip(),
+            "end_stage": str(args.end_stage or "summary").strip(),
+            "skip_split": bool(args.skip_split),
             "target_col": str(args.target_col or "").strip(),
             "input_feature_cols": str(args.input_feature_cols or "").strip(),
+            "split_method": str(args.split_method or "global_last_k").strip(),
+            "split_cutoff_date": str(args.split_cutoff_date or "").strip(),
+            "split_test_units": str(args.split_test_units or "").strip(),
             "train_ratio": args.train_ratio,
             "val_ratio": args.val_ratio,
             "test_ratio": args.test_ratio,

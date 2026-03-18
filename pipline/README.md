@@ -23,7 +23,7 @@
 
 ## 固定执行链
 
-### 统计分析任务
+### 数据处理任务
 
 ```text
 User Query
@@ -31,7 +31,10 @@ User Query
   -> data_reading
   -> data_formatter
   -> data_analysis
+  -> split_strategy
+  -> datanorm
   -> feature_engineering
+  -> preprocess
   -> summary
 ```
 
@@ -58,8 +61,8 @@ User Query
 ## 确定性替换说明
 
 - `orchestrator.py`：改为规则判断任务类型并生成固定 plan
-- `data_reading.py`：支持读取单个 `csv/pkl/npy/parquet` 文件，也支持拼接同目录下多个支持文件
-- `data_formatter.py`：支持显式指定模型输入列，按时间列排序，并提取 `date/hour/minute`
+- `data_reading.py`：支持按 `station=<unit>` 分区目录读取原始数据，并完成 ODS -> DS 转换
+- `data_formatter.py`：将 DS 序列列展开后按站点分别保存 `formatted_dataset_<station>.parquet`
 - `data_analysis.py`：基于本地分析工具生成统计信息和规则摘要
 - `split_strategy.py`：按时间顺序完成训练/验证/测试切分
 - `datanorm.py`：支持 `off/zscore/minmax/auto` 四种标准化策略选择
@@ -72,25 +75,72 @@ User Query
 ```text
 pipline/output/
   <task-id>/
+    data/
+      data_reading_ods_dataset.parquet
+      data_reading_ds_dataset.parquet
+      formatted/
+        formatted_dataset_<station>.parquet
+      split/
+        train_dataset.parquet
+        val_dataset.parquet
+        test_dataset.parquet
     final_summary.md
-    cross_iteration_ensemble.json
-    iteration_history.json
     <iteration-id>/
-      plan.json
-      data_reading/
-      data_formatter/
-      data_analysis/
-      feature_engineering/
-      split_strategy/
-      datanorm/
-      preprocess/
-      model_selection/
-      model_training/
-      model_integration/
-      evaluator/
-      summary/
+      feature_engineering_engineered_dataset_<station>.parquet
+      preprocess_train_preprocessed.parquet
+      preprocess_val_preprocessed.parquet
+      preprocess_test_preprocessed.parquet
+      model_training_executed_code.py
       summary.md
 ```
+
+说明：
+
+- 不再为每个 subagent 单独创建文件夹和 `result.json`
+- 一次性产物统一保存在任务级 `data/` 目录
+- 迭代型产物仍保存在对应 `iteration_*` 目录
+- 无论任务是否进入模型训练，执行结束后都会生成 `final_summary.md`
+
+## 阶段执行说明
+
+当前支持通过 `--start-stage` 和 `--end-stage` 只执行部分流程，也支持从中间产物继续启动。
+
+### 合法组合
+
+| start_stage | end_stage | 是否可用 | 说明 |
+|---|---|---:|---|
+| `data_reading` | `data_reading` | 是 | 只做原始目录读取和 ODS/DS 转换 |
+| `data_reading` | `data_formatter` | 是 | 生成每站 formatted parquet |
+| `data_reading` | `data_analysis` | 是 | 在 formatted 基础上做分析 |
+| `data_reading` | `split_strategy` | 是 | 做到数据切分 |
+| `data_reading` | `preprocess` | 是 | 完整数据处理到预处理结束 |
+| `data_reading` | `model_training` / `summary` | 是 | 完整链路 |
+| `data_formatter` | `data_formatter` | 是 | 输入必须是 DS 数据或任务目录 |
+| `data_formatter` | `preprocess` | 是 | 从 DS 继续跑后续数据处理 |
+| `data_analysis` | `data_analysis` | 是 | 输入必须是 formatted 数据或任务目录 |
+| `data_analysis` | `preprocess` | 是 | 从 formatted 开始做到预处理 |
+| `feature_engineering` | `feature_engineering` | 是 | 只做特征工程 |
+| `feature_engineering` | `preprocess` | 是 | 特征工程后接预处理 |
+| `split_strategy` | `split_strategy` | 是 | 只做数据切分 |
+| `model_selection` | `summary` | 是 | 输入必须是 preprocessed 数据目录 |
+| `model_training` | `summary` | 是 | 从已有预处理结果直接训练 |
+
+### 当前不支持的组合
+
+| start_stage | end_stage | 原因 |
+|---|---|---|
+| `split_strategy` | `preprocess` | `preprocess` 依赖 `feature_engineering` 输出的 engineered dataset，不能跳过 |
+| `datanorm` | `preprocess` | 同样缺少 engineered dataset |
+| 任意阶段 | 比 `start_stage` 更早的 `end_stage` | orchestrator 会直接报错 |
+
+### `dataset_path` 输入要求
+
+| start_stage | dataset_path 应指向 |
+|---|---|
+| `data_reading` | 原始站点目录，形如 `station=<unit>/...` |
+| `data_formatter` | `ds_dataset.parquet` 文件，或包含 `data/data_reading_ds_dataset.parquet` 的任务目录 |
+| `data_analysis` / `feature_engineering` / `split_strategy` / `datanorm` / `preprocess` | 包含 `formatted_dataset_*.parquet` 的目录，或任务根目录 |
+| `model_selection` / `model_training` / `model_integration` / `evaluator` / `summary` | 包含 `train_preprocessed.parquet` 的目录 |
 
 ## 使用方式
 
@@ -116,6 +166,9 @@ python main.py \
 - `--use-system-random`：特征工程在不同 iteration 中使用 `SystemRandom` 做随机策略选择
 - `--disable-system-random`：关闭 `SystemRandom`，改为确定性种子策略，便于复现
 - `--train-ratio/--val-ratio/--test-ratio`：支持非归一化输入，程序会自动归一化，例如 `8/2/1`
+- `--start-stage/--end-stage`：控制流程起止阶段
+- `--formatter-unit`：在 `data_formatter` 阶段重新选择要处理的站点
+- `--skip-split`：跳过 `split_strategy`，用于只做数据处理或直接训练
 
 ### Web UI
 

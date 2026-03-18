@@ -24,6 +24,10 @@ def _lines_for_models(rows: List[Dict]) -> List[str]:
     return lines
 
 
+def _to_json(payload: Dict) -> str:
+    return json.dumps(payload, ensure_ascii=False, indent=2, default=str)
+
+
 def _executive_summary(state: DGGlobalState) -> str:
     dataset_profile = state.read("dataset_profile", {})
     evaluator = state.read("evaluator_result", {})
@@ -75,25 +79,25 @@ def run(state: DGGlobalState) -> Dict:
         f"- Iteration: {iteration_index}",
         "",
         "## Data Analysis",
-        json.dumps(analysis_result, ensure_ascii=False, indent=2),
+        _to_json(analysis_result),
         "",
         "## Data Formatter",
-        json.dumps(data_formatter_result, ensure_ascii=False, indent=2),
+        _to_json(data_formatter_result),
         "",
         "## Feature Engineering",
-        json.dumps(feature_engineering_result, ensure_ascii=False, indent=2),
+        _to_json(feature_engineering_result),
         "",
         "## Split Strategy",
-        json.dumps(split_strategy_result, ensure_ascii=False, indent=2),
+        _to_json(split_strategy_result),
         "",
         "## Data Normalization",
-        json.dumps(datanorm_result, ensure_ascii=False, indent=2),
+        _to_json(datanorm_result),
         "",
         "## Preprocess",
-        json.dumps(preprocess_result, ensure_ascii=False, indent=2),
+        _to_json(preprocess_result),
         "",
         "## Model Selection",
-        json.dumps(model_selection, ensure_ascii=False, indent=2),
+        _to_json(model_selection),
         "",
         "## Model Training Metrics",
     ]
@@ -102,13 +106,13 @@ def run(state: DGGlobalState) -> Dict:
         [
             "",
             "## Evaluator",
-            json.dumps(evaluator_result, ensure_ascii=False, indent=2),
+            _to_json(evaluator_result),
             "",
             "## Model Integration",
-            json.dumps(model_integration, ensure_ascii=False, indent=2),
+            _to_json(model_integration),
             "",
             "## Dataset Profile",
-            json.dumps(dataset_profile, ensure_ascii=False, indent=2),
+            _to_json(dataset_profile),
         ]
     )
     final_text = "\n".join(structured_lines)

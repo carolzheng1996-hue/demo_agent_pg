@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+import pandas as pd
+
 try:
     from .agent_loop import agent_loop, run_subagent
     from .config import DEFAULT_MAX_ITERATIONS, MAX_ITERATIONS_CAP, PLAN_FILE
@@ -11,7 +13,7 @@ try:
     from .subagents import SUBAGENT_REGISTRY
     from .task_manager import DGTaskManager
     from .teams import TEAM_REGISTRY
-    from .tools import ensure_task_context, mean_ensemble, prepare_iteration_artifacts, write_task_text_artifact
+    from .tools import ensure_task_context, mean_ensemble, prepare_iteration_artifacts
 except ImportError:
     from agent_loop import agent_loop, run_subagent
     from config import DEFAULT_MAX_ITERATIONS, MAX_ITERATIONS_CAP, PLAN_FILE
@@ -19,10 +21,34 @@ except ImportError:
     from subagents import SUBAGENT_REGISTRY
     from task_manager import DGTaskManager
     from teams import TEAM_REGISTRY
-    from tools import ensure_task_context, mean_ensemble, prepare_iteration_artifacts, write_task_text_artifact
+    from tools import ensure_task_context, mean_ensemble, prepare_iteration_artifacts
 
 
 class DGOrchestrator:
+    STAGE_ORDER = [
+        "data_reading",
+        "data_formatter",
+        "data_analysis",
+        "feature_engineering",
+        "split_strategy",
+        "datanorm",
+        "preprocess",
+        "model_selection",
+        "model_training",
+        "model_integration",
+        "evaluator",
+        "summary",
+    ]
+    MODEL_STAGES = {
+        "split_strategy",
+        "datanorm",
+        "preprocess",
+        "model_selection",
+        "model_training",
+        "model_integration",
+        "evaluator",
+    }
+
     def __init__(self, state: DGGlobalState, task_manager: DGTaskManager):
         self.state = state
         self.task_manager = task_manager
@@ -38,30 +64,30 @@ class DGOrchestrator:
             return "analysis_only"
         return "build_forecast_model"
 
-    @staticmethod
-    def _canonical_plan(intent: str) -> Tuple[List[str], Dict]:
-        if intent == "analysis_only":
-            plan = ["data_reading", "data_formatter", "data_analysis", "feature_engineering", "summary"]
-            task_type = "analysis_only"
-            requires_modeling = False
-        else:
-            plan = [
-                "data_reading",
-                "data_formatter",
-                "data_analysis",
-                "feature_engineering",
-                "split_strategy",
-                "datanorm",
-                "preprocess",
-                "model_selection",
-                "model_training",
-                "model_integration",
-                "evaluator",
-                "summary",
-            ]
-            task_type = "forecast_modeling"
-            requires_modeling = True
+    @classmethod
+    def _slice_plan(cls, start_stage: str, end_stage: str, skip_split: bool) -> List[str]:
+        if start_stage not in cls.STAGE_ORDER or end_stage not in cls.STAGE_ORDER:
+            raise ValueError(f"Unsupported stage range: {start_stage} -> {end_stage}")
+        start_index = cls.STAGE_ORDER.index(start_stage)
+        end_index = cls.STAGE_ORDER.index(end_stage)
+        if start_index > end_index:
+            raise ValueError(f"start_stage must not be after end_stage: {start_stage} -> {end_stage}")
 
+        plan = cls.STAGE_ORDER[start_index : end_index + 1]
+        if skip_split:
+            plan = [step for step in plan if step not in {"split_strategy", "model_integration", "evaluator"}]
+        return plan
+
+    @classmethod
+    def _canonical_plan(cls, intent: str, start_stage: str, end_stage: str, skip_split: bool) -> Tuple[List[str], Dict]:
+        plan = cls._slice_plan(start_stage, end_stage, skip_split)
+        requires_modeling = any(step in cls.MODEL_STAGES for step in plan)
+        if requires_modeling:
+            task_type = "forecast_modeling"
+        elif any(step in plan for step in {"data_reading", "data_formatter", "data_analysis", "feature_engineering", "preprocess"}):
+            task_type = "data_processing"
+        else:
+            task_type = "analysis_only"
         teams = [
             team_name
             for team_name, payload in TEAM_REGISTRY.items()
@@ -70,10 +96,13 @@ class DGOrchestrator:
         return plan, {
             "task_type": task_type,
             "requires_modeling": requires_modeling,
-            "requires_split": requires_modeling,
+            "requires_split": ("split_strategy" in plan) and not skip_split,
             "teams": teams,
             "reason": "deterministic_pipeline",
             "plan_source": "rule_based",
+            "start_stage": start_stage,
+            "end_stage": end_stage,
+            "skip_split": skip_split,
         }
 
     @staticmethod
@@ -89,6 +118,152 @@ class DGOrchestrator:
         if requires_modeling:
             iterative = ["feature_engineering", "preprocess"] + iterative
         return [step for step in plan if step in iterative]
+
+    @staticmethod
+    def _parse_name_list(raw: str) -> List[str]:
+        return [item.strip() for item in str(raw or "").split(",") if item.strip()]
+
+    @staticmethod
+    def _resolve_ds_path(dataset_path: str) -> Path:
+        candidate = Path(str(dataset_path))
+        if candidate.is_file():
+            return candidate
+        for nested in [
+            candidate / "ds_dataset.parquet",
+            candidate / "data_reading_ds_dataset.parquet",
+            candidate / "data" / "data_reading_ds_dataset.parquet",
+        ]:
+            if nested.exists():
+                return nested
+        raise FileNotFoundError(f"Cannot resolve ds_dataset.parquet from {dataset_path}")
+
+    @staticmethod
+    def _resolve_formatted_paths(dataset_path: str) -> Dict[str, str]:
+        candidate = Path(str(dataset_path))
+        if candidate.is_file():
+            station_name = candidate.stem.replace("formatted_dataset_", "") or "default"
+            return {station_name: str(candidate)}
+
+        station_paths: Dict[str, str] = {}
+        search_dirs = [candidate, candidate / "data" / "formatted"]
+        for search_dir in search_dirs:
+            if not search_dir.exists():
+                continue
+            for path in sorted(search_dir.glob("formatted_dataset_*.parquet")):
+                station_name = path.stem.replace("formatted_dataset_", "")
+                station_paths[station_name] = str(path)
+            if station_paths:
+                return station_paths
+        raise FileNotFoundError(f"No formatted_dataset_*.parquet found under {dataset_path}")
+
+    @staticmethod
+    def _resolve_preprocess_paths(dataset_path: str) -> Dict[str, str]:
+        candidate = Path(str(dataset_path))
+        if candidate.is_file():
+            raise ValueError("Preprocess bootstrap requires a directory containing train/val/test parquet files.")
+
+        mapping = {
+            "train": candidate / "train_preprocessed.parquet",
+            "val": candidate / "val_preprocessed.parquet",
+            "test": candidate / "test_preprocessed.parquet",
+        }
+        result = {name: str(path) for name, path in mapping.items() if path.exists()}
+        if "train" not in result:
+            raise FileNotFoundError(f"train_preprocessed.parquet not found under {dataset_path}")
+        return result
+
+    @staticmethod
+    def _infer_target_and_features(df: pd.DataFrame, target_hint: str) -> Tuple[str, List[str], str | None]:
+        columns = df.columns.tolist()
+        target = ""
+        if target_hint:
+            if target_hint in columns:
+                target = target_hint
+            else:
+                matches = [column for column in columns if column.startswith(f"{target_hint}_future_step_")]
+                if matches:
+                    target = matches[0]
+        if not target:
+            future_candidates = [column for column in columns if str(column).endswith("_future_step_0")]
+            target = future_candidates[0] if future_candidates else columns[-1]
+
+        date_col = "timestamp_win" if "timestamp_win" in columns else None
+        feature_cols = [
+            column
+            for column in df.select_dtypes(include=["number"]).columns.tolist()
+            if column not in {target, "__row_id__"}
+        ]
+        return target, feature_cols, date_col
+
+    def _bootstrap_data_formatter_input(self, dataset_path: str) -> None:
+        ds_path = self._resolve_ds_path(dataset_path)
+        self.state.write(
+            "dataset_loading_result",
+            {
+                "dataset_path": str(Path(dataset_path)),
+                "ds_dataset_path": str(ds_path),
+                "selected_units": self._parse_name_list(self.state.read("formatter_unit", "")) or self._parse_name_list(self.state.read("unit", "")),
+            },
+        )
+
+    def _bootstrap_formatted_profile(self, dataset_path: str) -> None:
+        formatted_paths = self._resolve_formatted_paths(dataset_path)
+        formatter_units = self._parse_name_list(self.state.read("formatter_unit", ""))
+        if formatter_units:
+            formatted_paths = {station: path for station, path in formatted_paths.items() if station in formatter_units}
+            if not formatted_paths:
+                raise ValueError(f"No formatted parquet matched formatter_unit={formatter_units}")
+
+        first_path = next(iter(formatted_paths.values()))
+        first_df = pd.read_parquet(Path(first_path))
+        target, feature_cols, date_col = self._infer_target_and_features(first_df, str(self.state.read("target_col", "")))
+        dataset_profile = {
+            "dataset_path": str(Path(dataset_path)),
+            "formatted_dataset_paths": formatted_paths,
+            "formatted_dataset_path": first_path,
+            "selected_units": list(formatted_paths.keys()),
+            "shape": [sum(len(pd.read_parquet(Path(path))) for path in formatted_paths.values()), int(first_df.shape[1])],
+            "columns": first_df.columns.tolist(),
+            "date_column": date_col,
+            "target_column": target,
+            "target_columns": [target],
+            "feature_columns": feature_cols,
+            "input_feature_columns": feature_cols,
+        }
+        self.state.write("dataset_profile", dataset_profile)
+
+    def _bootstrap_preprocess_profile(self, dataset_path: str) -> None:
+        preprocess_paths = self._resolve_preprocess_paths(dataset_path)
+        train_df = pd.read_parquet(Path(preprocess_paths["train"]))
+        target, feature_cols, date_col = self._infer_target_and_features(train_df, str(self.state.read("target_col", "")))
+        self.state.write(
+            "dataset_profile",
+            {
+                "dataset_path": str(Path(dataset_path)),
+                "date_column": date_col,
+                "target_column": target,
+                "target_columns": [target],
+                "feature_columns": feature_cols,
+                "input_feature_columns": feature_cols,
+                "shape": [int(train_df.shape[0]), int(train_df.shape[1])],
+                "columns": train_df.columns.tolist(),
+            },
+        )
+        self.state.write("preprocess_result", {"dataset_paths": preprocess_paths, "target_column": target})
+
+    def _bootstrap_from_stage(self, start_stage: str, dataset_path: str) -> None:
+        if start_stage == "data_reading":
+            return
+        if start_stage == "data_formatter":
+            self._bootstrap_data_formatter_input(dataset_path)
+            return
+        if start_stage in {"data_analysis", "feature_engineering", "split_strategy", "datanorm", "preprocess"}:
+            self._bootstrap_formatted_profile(dataset_path)
+            return
+        if start_stage in {"model_selection", "model_training", "model_integration", "evaluator", "summary"}:
+            self._bootstrap_preprocess_profile(dataset_path)
+            return
+        raise ValueError(f"Unsupported start_stage bootstrap: {start_stage}")
 
     def _run_model_iterations(self, plan: List[str]) -> Dict:
         iterative_steps = self._iterative_steps(plan, requires_modeling=True)
@@ -141,11 +316,6 @@ class DGOrchestrator:
                     + "\n",
                     encoding="utf-8",
                 )
-        write_task_text_artifact(
-            state=self.state,
-            relative_name="iteration_history.json",
-            content=json.dumps(final_payload, ensure_ascii=False, indent=2),
-        )
         return final_payload
 
     def _build_cross_iteration_ensemble(self, best_iteration_artifacts: List[Dict]) -> Dict:
@@ -173,16 +343,20 @@ class DGOrchestrator:
             "member_count": ensemble_result.get("member_count", len(best_iteration_artifacts)),
         }
         self.state.write("cross_iteration_ensemble_result", payload)
-        write_task_text_artifact(
-            state=self.state,
-            relative_name="cross_iteration_ensemble.json",
-            content=json.dumps(payload, ensure_ascii=False, indent=2),
-        )
         return payload
+
+    def _ensure_final_summary(self, outputs: Dict[str, Dict]) -> None:
+        final_report_path = self.state.read("final_report_path")
+        if final_report_path and Path(str(final_report_path)).exists():
+            return
+        outputs["summary"] = run_subagent("summary", SUBAGENT_REGISTRY["summary"], self.state, self.task_manager)
 
     def run(self, user_query: str, dataset_path: str, dataset_name: str = "custom") -> Tuple[List[str], Dict]:
         intent = self._analyze_intent(user_query)
-        plan, plan_meta = self._canonical_plan(intent)
+        start_stage = str(self.state.read("start_stage", "data_reading") or "data_reading")
+        end_stage = str(self.state.read("end_stage", "summary") or "summary")
+        skip_split = bool(self.state.read("skip_split", False))
+        plan, plan_meta = self._canonical_plan(intent, start_stage, end_stage, skip_split)
         self.state.update(
             {
                 "user_query": user_query,
@@ -193,6 +367,7 @@ class DGOrchestrator:
                 "selected_teams": plan_meta.get("teams", []),
             }
         )
+        self._bootstrap_from_stage(start_stage, dataset_path)
         ensure_task_context(self.state)
         PLAN_FILE.write_text(json.dumps({"plan": plan, "plan_meta": plan_meta}, ensure_ascii=False, indent=2), encoding="utf-8")
         self.task_manager.set_plan(plan)
@@ -202,9 +377,11 @@ class DGOrchestrator:
         pre_steps = self._pre_steps(plan, requires_modeling=bool(plan_meta.get("requires_modeling")))
         outputs = agent_loop(pre_steps, SUBAGENT_REGISTRY, self.state, self.task_manager)
 
-        if plan_meta.get("requires_modeling"):
+        if plan_meta.get("requires_modeling") and any(step in plan for step in {"model_selection", "model_training", "model_integration", "evaluator"}):
             outputs["iterations"] = self._run_model_iterations(plan)
         else:
             outputs.update(agent_loop([step for step in plan if step not in pre_steps], SUBAGENT_REGISTRY, self.state, self.task_manager))
+
+        self._ensure_final_summary(outputs)
 
         return plan, outputs

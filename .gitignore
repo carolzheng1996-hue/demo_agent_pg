@@ -9,3 +9,6 @@ output/
 5_DGagent/__pycache__/
 5_DGagent/subagents/__pycache__/
 5_DGagent/tools/__pycache__/
+pipline/.state/
+pipline/output/
+pipline/sample_station_data/

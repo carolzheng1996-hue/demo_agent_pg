@@ -5,6 +5,8 @@ from .artifacts import (
     read_step_code_artifact,
     write_step_artifact,
     write_step_code_artifact,
+    write_step_dataframe_artifact,
+    write_task_dataframe_artifact,
     write_task_text_artifact,
 )
 from .codegen import infer_target_column_from_query, parse_column_selection, parse_target_columns, regenerate_code_with_feedback
@@ -19,6 +21,8 @@ __all__ = [
     "read_step_code_artifact",
     "write_step_artifact",
     "write_step_code_artifact",
+    "write_step_dataframe_artifact",
+    "write_task_dataframe_artifact",
     "write_task_text_artifact",
     "infer_target_column_from_query",
     "parse_column_selection",

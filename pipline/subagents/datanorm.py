@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Dict
+
+import pandas as pd
 
 try:
     from ..state import DGGlobalState
@@ -14,8 +17,20 @@ def _auto_decision(state: DGGlobalState) -> Dict:
     profile = state.read("dataset_profile", {})
     requires_modeling = bool(state.read("plan_meta", {}).get("requires_modeling", False))
     target_col = profile.get("target_column")
-    raw_df = state.read_runtime("raw_df")
-    if not requires_modeling or raw_df is None or not target_col or target_col not in raw_df.columns:
+    station_paths = profile.get("formatted_dataset_paths") or {}
+    formatted_path = profile.get("formatted_dataset_path")
+    if not requires_modeling or (not station_paths and not formatted_path) or not target_col:
+        return {"should_normalize": False, "recommended_mode": "skip", "reason": "analysis_only"}
+
+    if station_paths:
+        raw_df = pd.concat(
+            [pd.read_parquet(Path(str(path))) for path in station_paths.values()],
+            axis=0,
+            ignore_index=True,
+        )
+    else:
+        raw_df = pd.read_parquet(Path(str(formatted_path)))
+    if target_col not in raw_df.columns:
         return {"should_normalize": False, "recommended_mode": "skip", "reason": "analysis_only"}
 
     series = raw_df[target_col]

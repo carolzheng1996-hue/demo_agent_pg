@@ -13,8 +13,16 @@
   - `query`
   - `dataset_path`
   - `dataset_name`
+  - `unit`
+  - `formatter_unit`
+  - `start_stage`
+  - `end_stage`
+  - `skip_split`
   - `target_col`
   - `input_feature_cols`
+  - `split_method`
+  - `split_cutoff_date`
+  - `split_test_units`
   - `train_ratio`
   - `val_ratio`
   - `test_ratio`
@@ -34,6 +42,31 @@
 `use_system_random` 支持：
 - `true`
 - `false`
+
+`dataset_path` 约束：
+- 必须是按 `station=<unit>` 分区的数据目录
+- `unit` 为空时默认读取目录下全部站点；多个站点用逗号分隔
+- 当 `start_stage` 不是 `data_reading` 时，`dataset_path` 可以改为对应中间产物路径：
+  - `data_formatter`：`ds_dataset.parquet` 或其所在目录
+  - `data_analysis` / `feature_engineering` / `split_strategy` / `datanorm` / `preprocess`：`formatted_dataset_*.parquet` 所在目录
+  - `model_selection` / `model_training`：`train_preprocessed.parquet` 所在目录
+
+`split_method` 支持：
+- `global_last_k`
+- `station_last_k`
+- `station_month_last_k`
+- `fixed_date`
+- `leave_stations_out`
+
+附加切分参数：
+- `split_cutoff_date` 仅在 `split_method=fixed_date` 时生效
+- `split_test_units` 仅在 `split_method=leave_stations_out` 时生效，多个站点用逗号分隔
+- `skip_split=true` 时会跳过 `split_strategy`，并同时跳过 `model_integration` 与 `evaluator`
+
+阶段控制参数：
+- `start_stage`：允许从指定阶段启动流程
+- `end_stage`：允许在指定阶段结束流程，仅做数据处理
+- `formatter_unit`：允许在 `data_formatter` 阶段重新选择要处理的站点
 
 切分比例说明：
 - `train_ratio`、`val_ratio`、`test_ratio` 允许输入非归一化数值

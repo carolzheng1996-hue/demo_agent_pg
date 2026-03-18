@@ -26,7 +26,7 @@ except ImportError:
 
 
 WEB_DIR = BASE_DIR / "web"
-DEFAULT_DATASET_PATH = (BASE_DIR.parent / "data" / "ETTh1.csv").resolve()
+DEFAULT_DATASET_PATH = ""
 JOB_PAYLOAD_FILE = "job_payload.json"
 
 
@@ -95,18 +95,17 @@ def load_task_detail(task_id: str) -> Dict[str, Any]:
     requires_modeling = False
 
     for iteration_dir in iteration_dirs:
-        plan_payload = _read_json(iteration_dir / "plan.json") or {}
+        job_payload = _read_json(task_dir / JOB_PAYLOAD_FILE) or {}
+        plan_payload = {
+            "task_type": job_payload.get("query", ""),
+            "plan": [],
+        }
         task_type = plan_payload.get("task_type") or task_type
         requires_modeling = requires_modeling or bool(
             plan_payload.get("task_type") == "forecast_modeling"
             or any(step in (plan_payload.get("plan") or []) for step in ["model_selection", "model_training", "model_integration", "evaluator"])
         )
         steps = []
-        for step_dir in sorted([path for path in iteration_dir.iterdir() if path.is_dir()]):
-            detail = _step_detail(step_dir, task_dir)
-            result = detail.get("result") or {}
-            latest_dataset_profile = result.get("dataset_profile") or latest_dataset_profile
-            steps.append(detail)
 
         iterations.append(
             {
@@ -118,8 +117,15 @@ def load_task_detail(task_id: str) -> Dict[str, Any]:
         )
 
     final_summary = _read_text(task_dir / "final_summary.md")
-    iteration_history = _read_json(task_dir / "iteration_history.json") or {}
-    cross_iteration_ensemble = _summary_without_predictions(_read_json(task_dir / "cross_iteration_ensemble.json"))
+    job_payload = _read_json(task_dir / JOB_PAYLOAD_FILE) or {}
+    latest_dataset_profile = {
+        "dataset_path": job_payload.get("dataset_path"),
+        "target_column": job_payload.get("target_col"),
+        "target_columns": [item.strip() for item in str(job_payload.get("target_col", "")).split(",") if item.strip()],
+        "available_file_count": len([item.strip() for item in str(job_payload.get("unit", "")).split(",") if item.strip()]) or 0,
+    }
+    iteration_history: Dict[str, Any] = {}
+    cross_iteration_ensemble = None
     status = "completed" if final_summary else "running"
     return {
         "task_id": task_id,
@@ -203,8 +209,16 @@ class DGWebApplication:
             "query": "针对当前数据集构建一个时序预测模型",
             "dataset_path": str(DEFAULT_DATASET_PATH),
             "dataset_name": "sample_dataset",
+            "unit": "",
+            "formatter_unit": "",
+            "start_stage": "data_reading",
+            "end_stage": "summary",
+            "skip_split": False,
             "target_col": "",
             "input_feature_cols": "",
+            "split_method": "global_last_k",
+            "split_cutoff_date": "",
+            "split_test_units": "",
             "train_ratio": 0.7,
             "val_ratio": 0.1,
             "test_ratio": 0.2,
@@ -239,8 +253,16 @@ class DGWebApplication:
         try:
             ensure_directories()
             initial_state = {
+                "unit": str(payload.get("unit") or "").strip(),
+                "formatter_unit": str(payload.get("formatter_unit") or "").strip(),
+                "start_stage": str(payload.get("start_stage") or "data_reading").strip(),
+                "end_stage": str(payload.get("end_stage") or "summary").strip(),
+                "skip_split": bool(payload.get("skip_split", False)),
                 "target_col": str(payload.get("target_col") or "").strip(),
                 "input_feature_cols": str(payload.get("input_feature_cols") or "").strip(),
+                "split_method": str(payload.get("split_method") or "global_last_k").strip(),
+                "split_cutoff_date": str(payload.get("split_cutoff_date") or "").strip(),
+                "split_test_units": str(payload.get("split_test_units") or "").strip(),
                 "train_ratio": payload.get("train_ratio"),
                 "val_ratio": payload.get("val_ratio"),
                 "test_ratio": payload.get("test_ratio"),
@@ -373,8 +395,16 @@ class DGRequestHandler(BaseHTTPRequestHandler):
             "query": str(payload.get("query", "")).strip(),
             "dataset_path": str(payload.get("dataset_path", "")).strip(),
             "dataset_name": str(payload.get("dataset_name", "custom")).strip() or "custom",
+            "unit": str(payload.get("unit", "")).strip(),
+            "formatter_unit": str(payload.get("formatter_unit", "")).strip(),
+            "start_stage": str(payload.get("start_stage", "data_reading")).strip() or "data_reading",
+            "end_stage": str(payload.get("end_stage", "summary")).strip() or "summary",
+            "skip_split": self._coerce_bool(payload.get("skip_split"), default=False),
             "target_col": str(payload.get("target_col", "")).strip(),
             "input_feature_cols": str(payload.get("input_feature_cols", "")).strip(),
+            "split_method": str(payload.get("split_method", "global_last_k")).strip() or "global_last_k",
+            "split_cutoff_date": str(payload.get("split_cutoff_date", "")).strip(),
+            "split_test_units": str(payload.get("split_test_units", "")).strip(),
             "train_ratio": self._coerce_float(payload.get("train_ratio")) if ratios_required else None,
             "val_ratio": self._coerce_float(payload.get("val_ratio")) if ratios_required else None,
             "test_ratio": self._coerce_float(payload.get("test_ratio")) if ratios_required else None,

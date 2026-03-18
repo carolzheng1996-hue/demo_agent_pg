@@ -1,0 +1,54 @@
+# Todo
+
+## In Progress
+- [x] 梳理当前数据读取、格式化、切分、训练链路与 state 依赖
+- [x] 将 `data_loading_pg/data_reading_odsdata.py` 的 `convert_ods_to_ds` 接入现有 `data_reading` 流程
+- [x] 新增 `unit` 入参，用于按站点读取单站或多站数据
+- [x] 将 `data_loading_pg/data_split.py` 合入现有切分流程，支持用户选择切分方式与训练/验证比例
+- [x] 将 state 中的数据集存储改为路径存储，避免持久化或 runtime 依赖整表 DataFrame
+- [x] 确保链路调整为 `原始数据 -> ODS -> DS -> 数据集切分 -> 模型读入`
+- [x] 完成静态验证、diff 检查，并补充 review
+- [x] 优化 `data_formatter`，将多站点 DS 数据按站点合并为宽表
+- [x] 为不兼容的按站点切分方式增加显式校验
+- [x] 补充本次多站点合并改动的 review
+- [x] 调整 `data_formatter`，去掉站点列并按站点分别保存 parquet
+- [x] 同步下游模块读取多份 formatted parquet 的逻辑
+- [x] 更新 review，说明新的按站点落盘结构
+- [x] 支持用户配置流程起始阶段和结束阶段，只执行部分数据处理链路
+- [x] 支持在 `data_formatter` 阶段重新选择处理站点
+- [x] 支持跳过数据集切分，并允许从预处理产物直接进入模型训练阶段
+- [x] 优化 output，仅保留 iteration 级 summary 与必要 parquet，不再为每个 subagent 建目录/写 json
+- [x] 增加终端日志，后端单独运行时可见每个 step 的开始/结束状态
+- [x] 将特征工程改为按站点分别处理，避免一次拼接全部站点
+- [x] 精简特征工程默认开销：lag 仅保留 1/6，difference 仅保留 diff_1
+- [x] 将 `formatted` 与 `split` 一次性产物迁移到任务级目录，并补齐任务级路径的中间阶段启动兼容
+- [x] 为非 `summary` 结尾的 plan 增加任务级 `final_summary.md` 兜底生成逻辑
+- [x] 修复 `summary` 对 `Timestamp` 等对象的 JSON 序列化报错
+- [x] 在 README 中补充 `start_stage/end_stage` 合法组合、`dataset_path` 要求和最新输出结构
+
+## Review
+- 已将旧的通用文件读取逻辑替换为按 `station=<unit>` 分区目录读取，并在 `subagents/data_reading.py` 中接入 `convert_ods_to_ds`
+- 新增 `unit`、`split_method`、`split_cutoff_date`、`split_test_units` 参数，CLI、Web 后端和前端表单均已接入
+- `state` 中不再保存原始/格式化/切分后的 DataFrame；当前通过各步骤 artifact 路径在模块间传递数据
+- 数据链路已调整为 `原始目录 -> ODS parquet -> DS parquet -> formatted parquet -> split parquet -> engineered/preprocessed parquet -> 模型训练`
+- `split_strategy` 已集成 `data_loading_pg/data_split.py`，支持 `global_last_k`、`station_last_k`、`station_month_last_k`、`fixed_date`、`leave_stations_out`
+- 为兼容 DS 表中的序列列，`data_formatter` 会将 list 列展开为 `*_step_*` 数值列，并优先将 `*_future_step_0` 识别为训练目标
+- 静态验证已完成：检查了关键模块字段名与引用链；未运行 Python 脚本或测试，原因是仓库要求此类执行由用户触发
+- `data_formatter` 现已支持在存在多个站点时，先将 DS 序列列展开，再按 `timestamp_win` 将各站点数据合并为带站点前缀的宽表，例如 `A001__observe_power_step_0`
+- 合并后的宽表不再保留原始 `station` 列，因此 `split_strategy` 对 `station_last_k`、`station_month_last_k`、`leave_stations_out` 增加了显式兼容性校验
+- 本次优化仍未运行 Python 脚本或测试；验证方式为代码审查与差异复查
+- `data_formatter` 已改为每个站点单独输出一个 `formatted_dataset_<station>.parquet`，文件内容中移除了 `station` 列
+- 为保证后续切分与预处理可对齐，`__row_id__` 现按全局递增分配，避免不同站点文件出现重复 row id
+- `split_strategy`、`data_analysis`、`datanorm`、`feature_engineering` 已更新为从 `formatted_dataset_paths` 读取多份 parquet；仅 `split_strategy` 会在内存中临时补回 `station` 列用于按站点切分
+- 已新增 `start_stage`、`end_stage`、`skip_split`、`formatter_unit` 参数，允许只做数据处理、从中间产物继续、或直接从预处理结果进入模型阶段
+- orchestrator 现支持从 `ds_dataset.parquet`、`formatted_dataset_*.parquet`、`train_preprocessed.parquet` 所在目录等中间结果 bootstrap 继续执行
+- `skip_split=true` 时会跳过 `split_strategy`/`model_integration`/`evaluator`；`preprocess` 输出仅保留 train 数据，`model_training` 进入 fit-only 模式
+- iteration 输出结构已简化：不再为每个 subagent 创建目录和 `result.json`，当前以 `summary.md` 汇总各步骤结果，数据型产物直接写在 iteration 根目录
+- `agent_loop` 现会在终端打印 step 开始、完成和失败日志，便于仅跑后端时观察执行进度
+- `feature_engineering` 已改为逐站点读取 formatted parquet、逐站点生成 engineered parquet，再由下游按需拼接
+- 默认特征工程已减负：`lag_signature` 仅生成 `lag_1`、`lag_6`，`difference_signature` 仅生成 `diff_1`，并限制每轮特征方法数上限为 3
+- 一次性数据产物现统一落到任务级目录：ODS/DS 在 `output/<task-id>/data/`，formatted 在 `output/<task-id>/data/formatted/`，split 在 `output/<task-id>/data/split/`
+- orchestrator 已兼容从任务根目录或对应任务级数据目录继续启动 `data_formatter`/`split_strategy` 之后的流程，无需再手动定位到 iteration 目录
+- 任务结束时现会统一检查 `final_summary.md` 是否已生成；若本次 plan 未包含 `summary` 步骤，也会自动补跑一次 `summary`，保证任务级总结始终存在
+- `summary` 中展示各阶段 state payload 时，现统一通过 `default=str` 序列化，避免 `Timestamp`、numpy 标量等对象阻塞任务收尾
+- README 已同步当前真实行为：一次性产物位于任务级 `data/`，各阶段不再单独产出目录/json，并补充了分阶段执行的合法组合和中间启动要求

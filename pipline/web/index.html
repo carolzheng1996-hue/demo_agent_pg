@@ -43,12 +43,58 @@
 
               <label>
                 <span>数据集路径 <span class="required-mark">*</span></span>
-                <input id="dataset_path" name="dataset_path" type="text" required />
+                <input id="dataset_path" name="dataset_path" type="text" placeholder="/path/to/dataset_root" required />
               </label>
 
               <label>
                 <span>数据集名称</span>
                 <input id="dataset_name" name="dataset_name" type="text" />
+              </label>
+
+              <label>
+                <span>站点 Unit</span>
+                <input id="unit" name="unit" type="text" placeholder="单站如 A001；多站如 A001,B002" />
+              </label>
+
+              <label>
+                <span>Formatter Unit</span>
+                <input id="formatter_unit" name="formatter_unit" type="text" placeholder="仅在 data_formatter 起重新选站时使用" />
+              </label>
+
+              <label>
+                <span>Start Stage</span>
+                <select id="start_stage" name="start_stage">
+                  <option value="data_reading">data_reading</option>
+                  <option value="data_formatter">data_formatter</option>
+                  <option value="data_analysis">data_analysis</option>
+                  <option value="feature_engineering">feature_engineering</option>
+                  <option value="split_strategy">split_strategy</option>
+                  <option value="datanorm">datanorm</option>
+                  <option value="preprocess">preprocess</option>
+                  <option value="model_selection">model_selection</option>
+                  <option value="model_training">model_training</option>
+                  <option value="model_integration">model_integration</option>
+                  <option value="evaluator">evaluator</option>
+                  <option value="summary">summary</option>
+                </select>
+              </label>
+
+              <label>
+                <span>End Stage</span>
+                <select id="end_stage" name="end_stage">
+                  <option value="data_reading">data_reading</option>
+                  <option value="data_formatter">data_formatter</option>
+                  <option value="data_analysis">data_analysis</option>
+                  <option value="feature_engineering">feature_engineering</option>
+                  <option value="split_strategy">split_strategy</option>
+                  <option value="datanorm">datanorm</option>
+                  <option value="preprocess">preprocess</option>
+                  <option value="model_selection">model_selection</option>
+                  <option value="model_training">model_training</option>
+                  <option value="model_integration">model_integration</option>
+                  <option value="evaluator">evaluator</option>
+                  <option value="summary">summary</option>
+                </select>
               </label>
 
               <label>
@@ -73,6 +119,31 @@
                 <label>
                   <span>Test Ratio</span>
                   <input id="test_ratio" name="test_ratio" type="number" step="0.01" min="0" />
+                </label>
+                <label>
+                  <span>Split Method</span>
+                  <select id="split_method" name="split_method">
+                    <option value="global_last_k">global_last_k</option>
+                    <option value="station_last_k">station_last_k</option>
+                    <option value="station_month_last_k">station_month_last_k</option>
+                    <option value="fixed_date">fixed_date</option>
+                    <option value="leave_stations_out">leave_stations_out</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Split Cutoff</span>
+                  <input id="split_cutoff_date" name="split_cutoff_date" type="text" placeholder="2023-03-01" />
+                </label>
+                <label>
+                  <span>Split Test Units</span>
+                  <input id="split_test_units" name="split_test_units" type="text" placeholder="B001,B002" />
+                </label>
+                <label>
+                  <span>Skip Split</span>
+                  <select id="skip_split" name="skip_split">
+                    <option value="false">关闭</option>
+                    <option value="true">开启</option>
+                  </select>
                 </label>
                 <label>
                   <span>最大迭代轮数</span>
