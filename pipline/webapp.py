@@ -101,10 +101,16 @@ def load_task_detail(task_id: str) -> Dict[str, Any]:
         )
 
     final_summary = _read_text(task_dir / "final_summary.md")
+    explicit_target_col = str(job_payload.get("target_col", "")).strip()
+    explicit_targ_cols = [item.strip() for item in str(job_payload.get("targ_col_ls", "")).split(",") if item.strip()]
+    resolved_target_columns = [item.strip() for item in explicit_target_col.split(",") if item.strip()] or explicit_targ_cols
     latest_dataset_profile = {
         "dataset_path": job_payload.get("dataset_path") or task_plan.get("dataset_path"),
-        "target_column": job_payload.get("target_col"),
-        "target_columns": [item.strip() for item in str(job_payload.get("target_col", "")).split(",") if item.strip()],
+        "col_ls": job_payload.get("col_ls"),
+        "pred_col_ls": job_payload.get("pred_col_ls"),
+        "targ_col_ls": job_payload.get("targ_col_ls"),
+        "target_column": explicit_target_col or (resolved_target_columns[0] if resolved_target_columns else ""),
+        "target_columns": resolved_target_columns,
         "available_file_count": len([item.strip() for item in str(job_payload.get("unit", "")).split(",") if item.strip()]) or 0,
         "selected_units": [item.strip() for item in str(job_payload.get("unit", "")).split(",") if item.strip()],
         "start_stage": job_payload.get("start_stage") or plan_meta.get("start_stage"),
@@ -364,6 +370,9 @@ class DGRequestHandler(BaseHTTPRequestHandler):
             "end_stage": str(payload.get("end_stage", defaults["end_stage"])).strip() or defaults["end_stage"],
             "enable_split": self._coerce_bool(payload.get("enable_split"), default=bool(defaults["enable_split"])),
             "enable_feature_engineering": self._coerce_bool(payload.get("enable_feature_engineering"), default=bool(defaults["enable_feature_engineering"])),
+            "col_ls": str(payload.get("col_ls", defaults["col_ls"])).strip(),
+            "pred_col_ls": str(payload.get("pred_col_ls", defaults["pred_col_ls"])).strip(),
+            "targ_col_ls": str(payload.get("targ_col_ls", defaults["targ_col_ls"])).strip(),
             "target_col": str(payload.get("target_col", defaults["target_col"])).strip(),
             "input_feature_cols": str(payload.get("input_feature_cols", defaults["input_feature_cols"])).strip(),
             "split_method": str(payload.get("split_method", defaults["split_method"])).strip() or defaults["split_method"],

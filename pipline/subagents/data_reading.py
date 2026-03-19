@@ -9,20 +9,16 @@ try:
     from ..state import DGGlobalState
     from ..tools import (
         parse_column_selection,
-        parse_target_columns,
         write_step_artifact,
         write_task_dataframe_artifact,
     )
-    from ..tools.file_tools import set_features_multi, set_target
 except ImportError:
     from state import DGGlobalState
     from tools import (
         parse_column_selection,
-        parse_target_columns,
         write_step_artifact,
         write_task_dataframe_artifact,
     )
-    from tools.file_tools import set_features_multi, set_target
 
 
 def _load_ods_helpers() -> tuple[Any, Any]:
@@ -35,6 +31,23 @@ def _load_ods_helpers() -> tuple[Any, Any]:
 
 def _parse_name_list(raw: str) -> List[str]:
     return [item.strip() for item in str(raw or "").split(",") if item.strip()]
+
+
+def _parse_explicit_columns(
+    raw: Any,
+    available_columns: Sequence[str],
+    field_name: str,
+    *,
+    allow_empty: bool = False,
+) -> List[str]:
+    selected = parse_column_selection(raw, available_columns)
+    raw_items = _parse_name_list(raw) if isinstance(raw, str) else [str(item).strip() for item in (raw or []) if str(item).strip()]
+    missing = [item for item in raw_items if item.lower() not in {str(column).lower() for column in selected}]
+    if missing:
+        raise ValueError(f"{field_name} contains unknown columns: {missing}. Available columns: {list(available_columns)}")
+    if not selected and not allow_empty:
+        raise ValueError(f"{field_name} is required and must reference existing ODS columns.")
+    return selected
 
 
 def _list_available_units(dataset_path: Path) -> List[str]:
@@ -62,43 +75,26 @@ def _resolve_units(dataset_path: Path, raw_units: str) -> List[str]:
     return requested
 
 
-def _resolve_targets(ods_df: pd.DataFrame, state: DGGlobalState) -> List[str]:
-    explicit_targets = parse_target_columns(state.read("target_col"), ods_df.columns.tolist())
-    if explicit_targets:
-        return explicit_targets
-    return [set_target(ods_df)]
-
-
-def _resolve_input_columns(ods_df: pd.DataFrame, targets: Sequence[str], state: DGGlobalState) -> List[str]:
-    explicit_features = parse_column_selection(state.read("input_feature_cols"), ods_df.columns.tolist())
-    if explicit_features:
-        return [column for column in explicit_features if column not in targets]
-    excluded = {"station", "timestamp_win", "__index_level_0__"}
-    return [column for column in set_features_multi(ods_df, targets) if column not in excluded]
-
-
 def _build_ods_to_ds_config(
     ods_df: pd.DataFrame,
     state: DGGlobalState,
-    targets: Sequence[str],
 ) -> Dict[str, Any]:
     input_length = state.read("input_length")
     output_length = state.read("output_length")
     if input_length is None or output_length is None:
         raise ValueError("input_length/output_length is missing in state. Please provide them in config_all.json or runtime args.")
 
-    input_columns = _resolve_input_columns(ods_df, targets, state)
-    history_columns = [column for column in input_columns if not str(column).endswith("_predict")]
-    predict_columns = [column for column in input_columns if str(column).endswith("_predict")]
-    if not predict_columns:
-        predict_columns = [column for column in targets if column in ods_df.columns]
+    available_columns = ods_df.columns.tolist()
+    history_columns = _parse_explicit_columns(state.read("col_ls"), available_columns, "col_ls", allow_empty=True)
+    predict_columns = _parse_explicit_columns(state.read("pred_col_ls"), available_columns, "pred_col_ls", allow_empty=True)
+    target_columns = _parse_explicit_columns(state.read("targ_col_ls"), available_columns, "targ_col_ls")
     if not history_columns and not predict_columns:
-        raise ValueError("Unable to determine DS input columns. Please provide input_feature_cols and/or target_col.")
+        raise ValueError("At least one of col_ls or pred_col_ls must be provided for convert_ods_to_ds.")
 
     return {
         "col_ls": history_columns,
         "pred_col_ls": predict_columns,
-        "targ_col_ls": [column for column in targets if column in ods_df.columns],
+        "targ_col_ls": target_columns,
         "hist_win_size": int(input_length),
         "forcast_win_size": int(output_length),
     }
@@ -117,11 +113,19 @@ def run(state: DGGlobalState) -> Dict:
     ods_df["timestamp_win"] = pd.to_datetime(ods_df["timestamp_win"], errors="coerce")
     ods_df = ods_df.sort_values(["station", "timestamp_win"]).reset_index(drop=True)
 
-    target_columns = _resolve_targets(ods_df, state)
-    ods_to_ds_config = _build_ods_to_ds_config(ods_df, state, target_columns)
+    ods_to_ds_config = _build_ods_to_ds_config(ods_df, state)
+    target_columns = list(ods_to_ds_config["targ_col_ls"])
     ds_df = convert_ods_to_ds(ods_dataframe=ods_df, plant_ids=selected_units, config=ods_to_ds_config)
     ds_df["timestamp_win"] = pd.to_datetime(ds_df["timestamp_win"], errors="coerce")
     ds_df = ds_df.sort_values(["station", "timestamp_win"]).reset_index(drop=True)
+
+    derived_payload: Dict[str, Any] = {}
+    if not str(state.read("target_col") or "").strip() and target_columns:
+        derived_payload["target_col"] = ",".join(target_columns)
+    if not str(state.read("input_feature_cols") or "").strip():
+        derived_payload["input_feature_cols"] = ",".join(ods_to_ds_config["col_ls"] + ods_to_ds_config["pred_col_ls"])
+    if derived_payload:
+        state.update(derived_payload, persist=False)
 
     ds_path = write_task_dataframe_artifact(state, "data/data_reading_ds_dataset.parquet", ds_df)
     description = (
@@ -142,6 +146,8 @@ def run(state: DGGlobalState) -> Dict:
         "ds_shape": [int(ds_df.shape[0]), int(ds_df.shape[1])],
         "columns": [str(column) for column in ds_df.columns.tolist()],
         "ods_to_ds_config": ods_to_ds_config,
+        "resolved_target_col": str(state.read("target_col") or ""),
+        "resolved_input_feature_cols": str(state.read("input_feature_cols") or ""),
         "target_columns": list(target_columns),
     }
     state.update({"dataset_loading_result": payload})

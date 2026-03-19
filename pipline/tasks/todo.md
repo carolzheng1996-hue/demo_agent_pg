@@ -45,6 +45,8 @@
 - [x] 收敛切分逻辑为单次 train/val 切分，移除 test 集产物与读取链路
 - [x] 新增显式开关 `enable_feature_engineering`，允许直接跳过特征工程并从 formatted 数据进入 preprocess
 - [x] 收敛 README 和前端表单文案，明确三个流程开关及中间启动要求
+- [x] 将 `convert_ods_to_ds` 的 `col_ls/pred_col_ls/targ_col_ls` 改为显式输入，并停止由 `input_feature_cols/target_col` 隐式拆分
+- [x] 将 `data_formatter` 中 DS 长度补齐和 NaN 填补逻辑改为直接复用 `data_loading_pg/ds_to_train.py`
 
 ## Review
 - 已将旧的通用文件读取逻辑替换为按 `station=<unit>` 分区目录读取，并在 `subagents/data_reading.py` 中接入 `convert_ods_to_ds`
@@ -95,3 +97,5 @@
 - `split_strategy` 现只执行一次 train/val 切分，不再先切 test 再二次切 val；模型训练与集成改为以验证集作为唯一评估集
 - 运行配置现新增 `enable_feature_engineering`；关闭后 orchestrator 会从 plan 中移除 `feature_engineering`，`preprocess` 直接读取 formatted 数据继续处理
 - README 现明确说明 `enable_feature_engineering`、`enable_split`、`enable_normalization` 三个流程开关的作用，并补充“关闭三者的最小命令”和 zsh 多行续行注意事项；前端表单字段名也改成了更直白的中文
+- `data_reading` 现直接要求显式提供 `col_ls`、`pred_col_ls`、`targ_col_ls`，并在列名不存在时立即报错；`target_col` 与 `input_feature_cols` 仅作为下游格式化、分析和训练阶段的兼容字段保留
+- `data_formatter` 现不再维护单独的序列补齐/填补实现，而是直接调用 `data_loading_pg/ds_to_train.py` 中的 `pad_array_head`、`pad_array_tail`、`fill_nan`

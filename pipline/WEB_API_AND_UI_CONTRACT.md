@@ -21,6 +21,9 @@
   - `end_stage`
   - `enable_split`
   - `enable_feature_engineering`
+  - `col_ls`
+  - `pred_col_ls`
+  - `targ_col_ls`
   - `target_col`
   - `input_feature_cols`
   - `split_method`
@@ -80,6 +83,12 @@
 DS 清洗参数：
 - `points_per_day` 表示一天内的采样点数
 - `data_formatter` 会在 DS 进入切分和模型前，按 `input_length/output_length` 做序列补齐，并按 `points_per_day` 用“前一天同一时间点”优先填补数组内 NaN
+
+`convert_ods_to_ds` 参数约束：
+- `data_reading` 现在直接读取 `col_ls`、`pred_col_ls`、`targ_col_ls`
+- 不再使用 `target_col` / `input_feature_cols` 去自动拆分 `convert_ods_to_ds` 的三组列
+- `target_col` 和 `input_feature_cols` 仍保留给 `data_formatter`、分析和训练阶段使用
+- 若未显式传 `target_col`，后端会在 `data_reading` 成功后用 `targ_col_ls` 回填一个兼容值
 
 切分比例说明：
 - `train_ratio`、`val_ratio` 允许输入非归一化数值

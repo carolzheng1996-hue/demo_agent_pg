@@ -8,6 +8,7 @@ import pandas as pd
 
 try:
     from ..state import DGGlobalState
+    from ..data_loading_pg.ds_to_train import fill_nan, pad_array_head, pad_array_tail
     from ..tools import (
         infer_target_column_from_query,
         write_step_artifact,
@@ -16,6 +17,7 @@ try:
     from ..tools.file_tools import detect_date, set_features_multi, set_target
 except ImportError:
     from state import DGGlobalState
+    from data_loading_pg.ds_to_train import fill_nan, pad_array_head, pad_array_tail
     from tools import (
         infer_target_column_from_query,
         write_step_artifact,
@@ -102,46 +104,6 @@ def _sequence_length(value: object) -> int:
     return int(arr.shape[0]) if arr is not None else 0
 
 
-def _pad_array_head(value: object, target_len: int) -> np.ndarray:
-    arr = _normalize_sequence_value(value)
-    if arr is None:
-        return np.zeros(target_len, dtype=float)
-    if arr.shape[0] >= target_len:
-        return arr[:target_len]
-    return np.pad(arr, (target_len - arr.shape[0], 0), mode="constant")
-
-
-def _pad_array_tail(value: object, target_len: int) -> np.ndarray:
-    arr = _normalize_sequence_value(value)
-    if arr is None:
-        return np.zeros(target_len, dtype=float)
-    if arr.shape[0] >= target_len:
-        return arr[:target_len]
-    return np.pad(arr, (0, target_len - arr.shape[0]), mode="constant")
-
-
-def _fill_nan_sequence(value: object, points_per_day: int) -> np.ndarray:
-    arr = _normalize_sequence_value(value)
-    if arr is None:
-        return np.zeros(0, dtype=float)
-    if arr.size == 0:
-        return arr
-    if np.all(np.isnan(arr)):
-        return np.zeros_like(arr)
-
-    filled = arr.copy()
-    mean_val = float(np.nanmean(filled))
-    for idx in range(filled.shape[0]):
-        if not np.isnan(filled[idx]):
-            continue
-        previous_day_idx = idx - points_per_day
-        if previous_day_idx >= 0 and not np.isnan(filled[previous_day_idx]):
-            filled[idx] = filled[previous_day_idx]
-        else:
-            filled[idx] = mean_val
-    return filled
-
-
 def _sequence_target_length(column: str, config: Dict[str, int]) -> int:
     if "_predict" in column or "_future" in column:
         return int(config["output_length"])
@@ -161,9 +123,11 @@ def _clean_ds_sequences(df: pd.DataFrame, state: DGGlobalState) -> Tuple[pd.Data
             continue
 
         target_len = _sequence_target_length(column, config)
-        pad_fn = _pad_array_tail if ("_predict" in column or "_future" in column) else _pad_array_head
+        pad_fn = pad_array_tail if ("_predict" in column or "_future" in column) else pad_array_head
         original_lengths = series.apply(_sequence_length)
-        cleaned[column] = series.apply(lambda value: _fill_nan_sequence(pad_fn(value, target_len), config["points_per_day"]))
+        cleaned[column] = series.apply(
+            lambda value: fill_nan(pad_fn(_normalize_sequence_value(value), target_len), points_per_day=config["points_per_day"])
+        )
         repaired_columns.append(
             {
                 "column": column,

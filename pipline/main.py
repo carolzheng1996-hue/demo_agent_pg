@@ -79,6 +79,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--disable-split", dest="enable_split", action="store_false", help="关闭训练/验证切分")
     parser.add_argument("--enable-feature-engineering", dest="enable_feature_engineering", action="store_true", default=bool(defaults["enable_feature_engineering"]), help="启用特征工程")
     parser.add_argument("--disable-feature-engineering", dest="enable_feature_engineering", action="store_false", help="关闭特征工程，预处理将直接使用 formatted 数据")
+    parser.add_argument("--col-ls", default=defaults["col_ls"], help="显式指定 convert_ods_to_ds 的 col_ls，多个列用逗号分隔")
+    parser.add_argument("--pred-col-ls", default=defaults["pred_col_ls"], help="显式指定 convert_ods_to_ds 的 pred_col_ls，多个列用逗号分隔")
+    parser.add_argument("--targ-col-ls", default=defaults["targ_col_ls"], help="显式指定 convert_ods_to_ds 的 targ_col_ls，多个列用逗号分隔")
     parser.add_argument("--target-col", default=defaults["target_col"], help="显式指定目标列，多个列用逗号分隔")
     parser.add_argument("--input-feature-cols", default=defaults["input_feature_cols"], help="显式指定模型输入列，多个列用逗号分隔")
     parser.add_argument(
@@ -123,6 +126,9 @@ def main() -> None:
             "enable_split": args.enable_split,
             "skip_split": not args.enable_split,
             "enable_feature_engineering": args.enable_feature_engineering,
+            "col_ls": args.col_ls,
+            "pred_col_ls": args.pred_col_ls,
+            "targ_col_ls": args.targ_col_ls,
             "target_col": args.target_col,
             "input_feature_cols": args.input_feature_cols,
             "split_method": args.split_method,

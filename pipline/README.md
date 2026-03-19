@@ -38,7 +38,7 @@ data_reading
 说明：
 
 - `data_reading`：读取按 `station=<unit>` 分区的原始目录，并做 `ODS -> DS`
-- `data_formatter`：先对 DS 序列做长度补齐和 NaN 填补，再展开并按站点输出 formatted parquet
+- `data_formatter`：直接复用 `data_loading_pg/ds_to_train.py` 中的长度补齐和 NaN 填补函数清洗 DS，再展开并按站点输出 formatted parquet
 - `data_analysis`：生成基础统计与分析摘要
 - `feature_engineering`：按站点做特征工程
 - `split_strategy`：生成 train/val 切分
@@ -113,6 +113,7 @@ output/<task-id>/
 - 历史列按 `input_length` 头部补齐
 - `*_predict` / `*_future` 列按 `output_length` 尾部补齐
 - 按 `points_per_day` 用“前一天同一时刻优先”规则填补数组内 NaN
+- 上述清洗函数直接复用 `data_loading_pg/ds_to_train.py`
 - 将清洗后的 DS 展开成普通数值列
 - 按站点分别输出 formatted parquet
 
@@ -220,6 +221,9 @@ output/<task-id>/
 - `end_stage`
 - `enable_split`
 - `enable_feature_engineering`
+- `col_ls`
+- `pred_col_ls`
+- `targ_col_ls`
 - `target_col`
 - `input_feature_cols`
 - `split_method`
@@ -254,7 +258,7 @@ output/<task-id>/
 
 ## 当前版本推荐命令
 
-下面这些命令是适合当前版本的最常用示例，均显式给出 `target_col` 和 `input_feature_cols`。
+下面这些命令是适合当前版本的最常用示例。`convert_ods_to_ds` 相关列参数使用显式的 `col_ls`、`pred_col_ls`、`targ_col_ls`；`target_col` 和 `input_feature_cols` 继续作为下游格式化、分析和训练阶段的字段说明。
 
 ### 1. 只做 ODS/DS
 
@@ -268,6 +272,9 @@ python main.py \
   --unit "1,2" \
   --start-stage data_reading \
   --end-stage data_reading \
+  --col-ls GHI_real,GHI_SOLARGIS,TEMP_SOLARGIS,WS_SOLARGIS,WD_SOLARGIS,ssrd_pos_1,ssrd_pos_2,ssrd_pos_3,t2m_pos_1,t2m_pos_2,t2m_pos_3 \
+  --pred-col-ls GHI_SOLARGIS_predict,TEMP_SOLARGIS_predict,WS_SOLARGIS_predict,WD_SOLARGIS_predict,ssrd_pos_1_predict,ssrd_pos_2_predict,ssrd_pos_3_predict,t2m_pos_1_predict,t2m_pos_2_predict,t2m_pos_3_predict \
+  --targ-col-ls observe_power \
   --target-col observe_power \
   --input-feature-cols GHI_real,GHI_SOLARGIS,TEMP_SOLARGIS,WS_SOLARGIS,WD_SOLARGIS,GHI_SOLARGIS_predict,TEMP_SOLARGIS_predict,WS_SOLARGIS_predict,WD_SOLARGIS_predict,ssrd_pos_1,ssrd_pos_2,ssrd_pos_3,t2m_pos_1,t2m_pos_2,t2m_pos_3,ssrd_pos_1_predict,ssrd_pos_2_predict,ssrd_pos_3_predict,t2m_pos_1_predict,t2m_pos_2_predict,t2m_pos_3_predict
 ```
@@ -284,6 +291,9 @@ python main.py \
   --unit "1,2" \
   --start-stage data_reading \
   --end-stage preprocess \
+  --col-ls GHI_real,GHI_SOLARGIS,TEMP_SOLARGIS,WS_SOLARGIS,WD_SOLARGIS,ssrd_pos_1,ssrd_pos_2,ssrd_pos_3,t2m_pos_1,t2m_pos_2,t2m_pos_3 \
+  --pred-col-ls GHI_SOLARGIS_predict,TEMP_SOLARGIS_predict,WS_SOLARGIS_predict,WD_SOLARGIS_predict,ssrd_pos_1_predict,ssrd_pos_2_predict,ssrd_pos_3_predict,t2m_pos_1_predict,t2m_pos_2_predict,t2m_pos_3_predict \
+  --targ-col-ls observe_power \
   --target-col observe_power \
   --input-feature-cols GHI_real,GHI_SOLARGIS,TEMP_SOLARGIS,WS_SOLARGIS,WD_SOLARGIS,GHI_SOLARGIS_predict,TEMP_SOLARGIS_predict,WS_SOLARGIS_predict,WD_SOLARGIS_predict,ssrd_pos_1,ssrd_pos_2,ssrd_pos_3,t2m_pos_1,t2m_pos_2,t2m_pos_3,ssrd_pos_1_predict,ssrd_pos_2_predict,ssrd_pos_3_predict,t2m_pos_1_predict,t2m_pos_2_predict,t2m_pos_3_predict \
   --points-per-day 96 \
@@ -299,6 +309,9 @@ python main.py \
   --config-all ./config_all.json \
   --query "只做数据处理" \
   --dataset-path /Users/monychen/Documents/demo-zjl/pipline/sample_station_data \
+  --col-ls GHI_real,GHI_SOLARGIS,TEMP_SOLARGIS,WS_SOLARGIS,WD_SOLARGIS \
+  --pred-col-ls "" \
+  --targ-col-ls observe_power \
   --target-col observe_power \
   --input-feature-cols GHI_real,GHI_SOLARGIS,TEMP_SOLARGIS,WS_SOLARGIS,WD_SOLARGIS \
   --disable-feature-engineering \
@@ -319,6 +332,9 @@ python main.py \
   --unit "1,2" \
   --start-stage data_reading \
   --end-stage summary \
+  --col-ls GHI_real,GHI_SOLARGIS,TEMP_SOLARGIS,WS_SOLARGIS,WD_SOLARGIS,ssrd_pos_1,ssrd_pos_2,ssrd_pos_3,t2m_pos_1,t2m_pos_2,t2m_pos_3 \
+  --pred-col-ls GHI_SOLARGIS_predict,TEMP_SOLARGIS_predict,WS_SOLARGIS_predict,WD_SOLARGIS_predict,ssrd_pos_1_predict,ssrd_pos_2_predict,ssrd_pos_3_predict,t2m_pos_1_predict,t2m_pos_2_predict,t2m_pos_3_predict \
+  --targ-col-ls observe_power \
   --target-col observe_power \
   --input-feature-cols GHI_real,GHI_SOLARGIS,TEMP_SOLARGIS,WS_SOLARGIS,WD_SOLARGIS,GHI_SOLARGIS_predict,TEMP_SOLARGIS_predict,WS_SOLARGIS_predict,WD_SOLARGIS_predict,ssrd_pos_1,ssrd_pos_2,ssrd_pos_3,t2m_pos_1,t2m_pos_2,t2m_pos_3,ssrd_pos_1_predict,ssrd_pos_2_predict,ssrd_pos_3_predict,t2m_pos_1_predict,t2m_pos_2_predict,t2m_pos_3_predict \
   --points-per-day 96 \
@@ -382,6 +398,7 @@ Web 表单与 CLI 共用同一套配置来源：
 
 ## 说明
 
-- 当前版本支持目标列和输入列自动推断，但真实使用时建议显式传 `target_col` 和 `input_feature_cols`
+- `data_reading` 不再根据 `target_col` / `input_feature_cols` 自动推断 `convert_ods_to_ds` 的三组列；必须显式传 `col_ls`、`pred_col_ls`、`targ_col_ls`
+- 如果未显式传 `target_col` 或 `input_feature_cols`，系统会在 `data_reading` 成功后分别用 `targ_col_ls` 和 `col_ls + pred_col_ls` 补给下游阶段
 - 多行命令必须在每一行末尾加 `\`，否则 zsh 会把下一行当成新命令
 - Python 运行验证需要你自己执行

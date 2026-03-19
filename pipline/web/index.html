@@ -103,12 +103,27 @@
               </label>
 
               <label>
-                <span>目标列</span>
+                <span>DS col_ls</span>
+                <input id="col_ls" name="col_ls" type="text" placeholder="例如 GHI_real,TEMP_SOLARGIS,WS_SOLARGIS" />
+              </label>
+
+              <label>
+                <span>DS pred_col_ls</span>
+                <input id="pred_col_ls" name="pred_col_ls" type="text" placeholder="例如 GHI_SOLARGIS_predict,TEMP_SOLARGIS_predict" />
+              </label>
+
+              <label>
+                <span>DS targ_col_ls</span>
+                <input id="targ_col_ls" name="targ_col_ls" type="text" placeholder="例如 observe_power" />
+              </label>
+
+              <label>
+                <span>训练目标列</span>
                 <input id="target_col" name="target_col" type="text" placeholder="单列如 target；多列如 target,label" />
               </label>
 
               <label>
-                <span>输入列</span>
+                <span>模型输入列</span>
                 <input id="input_feature_cols" name="input_feature_cols" type="text" placeholder="例如 TEMP,WS,WD,PREC" />
               </label>
 
