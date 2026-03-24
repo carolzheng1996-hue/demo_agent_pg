@@ -18,11 +18,23 @@ except ImportError:
     from tools import compare_models_with_metrics, compute_metrics_extended, write_step_artifact
 
 
-def _load_split_frames(state: DGGlobalState) -> Dict[str, pd.DataFrame]:
+def _read_frame_parts(path_value: str | List[str], columns: List[str]) -> pd.DataFrame:
+    paths = path_value if isinstance(path_value, list) else [path_value]
+    parts = [pd.read_parquet(Path(str(path)), columns=columns) for path in paths if path]
+    if not parts:
+        return pd.DataFrame(columns=columns)
+    return pd.concat(parts, axis=0, ignore_index=True)
+
+
+def _load_split_frames(state: DGGlobalState, columns: List[str]) -> Dict[str, pd.DataFrame]:
     dataset_paths = state.read("preprocess_result", {}).get("dataset_paths", {})
     if not dataset_paths.get("train"):
         raise RuntimeError("Missing preprocessed train dataset path.")
-    return {name: pd.read_parquet(Path(str(path))) for name, path in dataset_paths.items() if path}
+    return {
+        name: _read_frame_parts(path_value, columns)
+        for name, path_value in dataset_paths.items()
+        if path_value
+    }
 
 
 def run(state: DGGlobalState) -> Dict:
@@ -31,7 +43,9 @@ def run(state: DGGlobalState) -> Dict:
     if not target_col:
         raise RuntimeError("Missing target column in dataset profile.")
 
-    frames = _load_split_frames(state)
+    preprocess_result = state.read("preprocess_result", {}) or {}
+    candidate_columns = list(dict.fromkeys([target_col] + list(preprocess_result.get("numeric_columns", []) or [])))
+    frames = _load_split_frames(state, candidate_columns)
     train_df = frames["train"].reset_index(drop=True)
     val_df = frames.get("val", train_df.iloc[0:0].copy()).reset_index(drop=True)
     if any(target_col not in frame.columns for frame in frames.values()):
@@ -41,8 +55,8 @@ def run(state: DGGlobalState) -> Dict:
     val = pd.to_numeric(val_df[target_col], errors="coerce").to_numpy(dtype=float)
     split_applied = len(val) > 0
 
-    train_frame = train_df.select_dtypes(include=["number"]).copy()
-    val_frame = val_df.select_dtypes(include=["number"]).copy()
+    train_frame = train_df.select_dtypes(include=["number"]).astype("float32", copy=False)
+    val_frame = val_df.select_dtypes(include=["number"]).astype("float32", copy=False)
     for frame in (train_frame, val_frame):
         if "__row_id__" in frame.columns:
             frame.drop(columns=["__row_id__"], inplace=True)

@@ -62,15 +62,9 @@
               </label>
 
               <label>
-                <span>Formatter Unit</span>
-                <input id="formatter_unit" name="formatter_unit" type="text" placeholder="仅在 data_formatter 起重新选站时使用" />
-              </label>
-
-              <label>
                 <span>Start Stage</span>
                 <select id="start_stage" name="start_stage">
                   <option value="data_reading">data_reading</option>
-                  <option value="data_formatter">data_formatter</option>
                   <option value="data_analysis">data_analysis</option>
                   <option value="feature_engineering">feature_engineering</option>
                   <option value="split_strategy">split_strategy</option>
@@ -88,7 +82,6 @@
                 <span>End Stage</span>
                 <select id="end_stage" name="end_stage">
                   <option value="data_reading">data_reading</option>
-                  <option value="data_formatter">data_formatter</option>
                   <option value="data_analysis">data_analysis</option>
                   <option value="feature_engineering">feature_engineering</option>
                   <option value="split_strategy">split_strategy</option>
@@ -181,7 +174,7 @@
                   <input id="output_length" name="output_length" type="number" step="1" min="1" />
                 </label>
                 <label>
-                  <span>Points Per Day</span>
+                  <span>Points Per Day(预留)</span>
                   <input id="points_per_day" name="points_per_day" type="number" step="1" min="1" />
                 </label>
                 <label>

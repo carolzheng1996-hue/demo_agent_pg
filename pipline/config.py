@@ -23,11 +23,9 @@ DEFAULT_TRAINING_PARAMS: Dict[str, Dict] = {
 PIPELINE_RUNTIME_DEFAULTS: Dict[str, Any] = {
     "dataset_name": "sample_dataset",
     "unit": "",
-    "formatter_unit": "",
     "start_stage": "data_reading",
     "end_stage": "summary",
     "enable_split": True,
-    "skip_split": False,
     "enable_feature_engineering": True,
     "col_ls": "",
     "pred_col_ls": "",
@@ -86,7 +84,6 @@ def build_runtime_state(
     for key in [
         "dataset_name",
         "unit",
-        "formatter_unit",
         "start_stage",
         "end_stage",
         "col_ls",
@@ -101,11 +98,7 @@ def build_runtime_state(
     ]:
         payload[key] = str(payload.get(key, "") or "").strip()
 
-    payload["enable_split"] = _coerce_boolish(
-        payload.get("enable_split"),
-        default=not _coerce_boolish(payload.get("skip_split"), default=False),
-    )
-    payload["skip_split"] = not payload["enable_split"]
+    payload["enable_split"] = _coerce_boolish(payload.get("enable_split"), default=True)
     payload["enable_feature_engineering"] = _coerce_boolish(payload.get("enable_feature_engineering"), default=True)
     payload["enable_normalization"] = _coerce_boolish(payload.get("enable_normalization"), default=True)
     payload["use_system_random"] = _coerce_boolish(payload.get("use_system_random"), default=True)

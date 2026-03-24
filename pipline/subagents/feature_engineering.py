@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-import hashlib
-import random
-import time
-from pathlib import Path
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, List, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -12,127 +8,203 @@ import pandas as pd
 try:
     from ..state import DGGlobalState
     from ..tools import write_step_artifact, write_step_dataframe_artifact
+    from .ds_pipeline_utils import load_ds_dataframe, load_ds_station_frames, normalize_sequence_value
 except ImportError:
     from state import DGGlobalState
     from tools import write_step_artifact, write_step_dataframe_artifact
+    from subagents.ds_pipeline_utils import load_ds_dataframe, load_ds_station_frames, normalize_sequence_value
 
 
-FeatureMethod = Callable[[pd.DataFrame, List[str]], Tuple[pd.DataFrame, List[str]]]
+FeatureMethod = Callable[[pd.DataFrame, Sequence[str]], Tuple[pd.DataFrame, List[str]]]
 
 
-def _numeric_series(df: pd.DataFrame, column: str) -> pd.Series:
-    return pd.to_numeric(df[column], errors="coerce").ffill().bfill()
+def _safe_sequence(series: pd.Series) -> List[np.ndarray]:
+    values: List[np.ndarray] = []
+    for value in series:
+        arr = normalize_sequence_value(value)
+        values.append(arr if arr is not None else np.zeros(0, dtype=float))
+    return values
 
 
-def _safe_feature_columns(df: pd.DataFrame, columns: List[str]) -> List[str]:
-    return [column for column in columns if column in df.columns]
+def _concat_feature_block(df: pd.DataFrame, block: Dict[str, pd.Series]) -> Tuple[pd.DataFrame, List[str]]:
+    filtered = {name: values for name, values in block.items() if name not in df.columns}
+    if not filtered:
+        return df, []
+    return pd.concat([df, pd.DataFrame(filtered, index=df.index)], axis=1).copy(), list(filtered.keys())
 
 
-def _concat_feature_block(engineered: pd.DataFrame, feature_block: Dict[str, pd.Series]) -> Tuple[pd.DataFrame, List[str]]:
-    if not feature_block:
-        return engineered, []
-    filtered_block = {
-        name: values for name, values in feature_block.items() if name not in engineered.columns
-    }
-    if not filtered_block:
-        return engineered, []
-    created = list(filtered_block.keys())
-    block_df = pd.DataFrame(filtered_block, index=engineered.index)
-    return pd.concat([engineered, block_df], axis=1).copy(), created
+def _safe_skew(arr: np.ndarray) -> float:
+    if len(arr) < 3:
+        return 0.0
+    mean = float(arr.mean())
+    std = float(arr.std())
+    if std <= 1e-12:
+        return 0.0
+    centered = arr - mean
+    return float(np.mean(centered ** 3) / (std ** 3))
 
 
-def _add_lag_features(engineered: pd.DataFrame, source_columns: List[str]) -> Tuple[pd.DataFrame, List[str]]:
-    feature_block: Dict[str, pd.Series] = {}
-    for column in _safe_feature_columns(engineered, source_columns):
-        series = _numeric_series(engineered, column)
-        for lag in (1, 6):
-            name = f"{column}_lag_{lag}"
-            feature_block[name] = series.shift(lag)
-    return _concat_feature_block(engineered, feature_block)
+def _safe_kurtosis(arr: np.ndarray) -> float:
+    if len(arr) < 4:
+        return 0.0
+    mean = float(arr.mean())
+    std = float(arr.std())
+    if std <= 1e-12:
+        return 0.0
+    centered = arr - mean
+    return float(np.mean(centered ** 4) / (std ** 4))
 
 
-def _add_rolling_features(engineered: pd.DataFrame, source_columns: List[str]) -> Tuple[pd.DataFrame, List[str]]:
-    feature_block: Dict[str, pd.Series] = {}
-    for column in _safe_feature_columns(engineered, source_columns):
-        series = _numeric_series(engineered, column)
-        specs = [
-            (6, "mean"),
-            (24, "mean"),
-            (24, "std"),
-            (24, "min"),
-            (24, "max"),
-        ]
-        for window, kind in specs:
-            name = f"{column}_rolling_{kind}_{window}"
-            if kind == "mean":
-                feature_block[name] = series.rolling(window, min_periods=1).mean()
-            elif kind == "std":
-                feature_block[name] = series.rolling(window, min_periods=1).std().fillna(0.0)
-            elif kind == "min":
-                feature_block[name] = series.rolling(window, min_periods=1).min()
-            else:
-                feature_block[name] = series.rolling(window, min_periods=1).max()
-    return _concat_feature_block(engineered, feature_block)
+def _safe_mean_n_absolute_max(arr: np.ndarray, n: int = 3) -> float:
+    if not len(arr):
+        return 0.0
+    ranked = np.sort(np.abs(arr))[-min(n, len(arr)) :]
+    return float(ranked.mean()) if len(ranked) else 0.0
 
 
-def _add_difference_features(engineered: pd.DataFrame, source_columns: List[str]) -> Tuple[pd.DataFrame, List[str]]:
-    feature_block: Dict[str, pd.Series] = {}
-    for column in _safe_feature_columns(engineered, source_columns):
-        series = _numeric_series(engineered, column)
-        mapping = {
-            f"{column}_diff_1": series.diff(1),
-        }
-        feature_block.update(mapping)
-    return _concat_feature_block(engineered, feature_block)
+def _safe_absolute_sum_of_changes(arr: np.ndarray) -> float:
+    if len(arr) < 2:
+        return 0.0
+    return float(np.abs(np.diff(arr)).sum())
 
 
-def _add_ewm_features(engineered: pd.DataFrame, source_columns: List[str]) -> Tuple[pd.DataFrame, List[str]]:
-    feature_block: Dict[str, pd.Series] = {}
-    for column in _safe_feature_columns(engineered, source_columns):
-        series = _numeric_series(engineered, column)
-        mapping = {
-            f"{column}_ewm_mean_12": series.ewm(span=12, adjust=False).mean(),
-            f"{column}_ewm_mean_24": series.ewm(span=24, adjust=False).mean(),
-            f"{column}_ewm_std_24": series.ewm(span=24, adjust=False).std().fillna(0.0),
-        }
-        feature_block.update(mapping)
-    return _concat_feature_block(engineered, feature_block)
+def _safe_mean_change(arr: np.ndarray) -> float:
+    if len(arr) < 2:
+        return 0.0
+    return float(np.diff(arr).mean())
 
 
-def _add_peak_features(engineered: pd.DataFrame, source_columns: List[str]) -> Tuple[pd.DataFrame, List[str]]:
-    feature_block: Dict[str, pd.Series] = {}
-    for column in _safe_feature_columns(engineered, source_columns):
-        series = _numeric_series(engineered, column)
-        rolling_mean = series.rolling(24, min_periods=1).mean()
-        rolling_std = series.rolling(24, min_periods=1).std().fillna(0.0)
-        diff_sign = series.diff().fillna(0.0).apply(lambda value: 1 if value > 0 else (-1 if value < 0 else 0))
-        mapping = {
-            f"{column}_abs_energy_24": series.pow(2).rolling(24, min_periods=1).sum(),
-            f"{column}_peak_count_24": (series > (rolling_mean + rolling_std)).astype(int).rolling(24, min_periods=1).sum(),
-            f"{column}_turning_points_24": diff_sign.diff().abs().fillna(0.0).rolling(24, min_periods=1).sum(),
-        }
-        feature_block.update(mapping)
-    return _concat_feature_block(engineered, feature_block)
+def _safe_mean_abs_change(arr: np.ndarray) -> float:
+    if len(arr) < 2:
+        return 0.0
+    return float(np.abs(np.diff(arr)).mean())
 
 
-def _add_calendar_features(engineered: pd.DataFrame, source_columns: List[str]) -> Tuple[pd.DataFrame, List[str]]:
-    _ = source_columns
-    date_col = engineered.attrs.get("date_column")
-    if not date_col or date_col not in engineered.columns:
-        return engineered, []
-    dt = pd.to_datetime(engineered[date_col], errors="coerce")
-    feature_block = {
+def _safe_mean_second_derivative_central(arr: np.ndarray) -> float:
+    if len(arr) < 3:
+        return 0.0
+    second = arr[2:] - 2 * arr[1:-1] + arr[:-2]
+    return float(second.mean()) if len(second) else 0.0
+
+
+def _safe_slope(arr: np.ndarray) -> float:
+    if len(arr) < 2:
+        return 0.0
+    x = np.arange(len(arr), dtype=float)
+    x_mean = float(x.mean())
+    y_mean = float(arr.mean())
+    denominator = float(np.square(x - x_mean).sum())
+    if denominator <= 1e-12:
+        return 0.0
+    numerator = float(((x - x_mean) * (arr - y_mean)).sum())
+    return float(numerator / denominator)
+
+
+def _add_distribution_features(df: pd.DataFrame, columns: Sequence[str]) -> Tuple[pd.DataFrame, List[str]]:
+    block: Dict[str, pd.Series] = {}
+    for column in columns:
+        sequences = _safe_sequence(df[column])
+        block[f"{column}__mean"] = pd.Series([float(arr.mean()) if len(arr) else 0.0 for arr in sequences], index=df.index)
+        block[f"{column}__median"] = pd.Series([float(np.median(arr)) if len(arr) else 0.0 for arr in sequences], index=df.index)
+        block[f"{column}__minimum"] = pd.Series([float(arr.min()) if len(arr) else 0.0 for arr in sequences], index=df.index)
+        block[f"{column}__maximum"] = pd.Series([float(arr.max()) if len(arr) else 0.0 for arr in sequences], index=df.index)
+        block[f"{column}__standard_deviation"] = pd.Series([float(arr.std()) if len(arr) else 0.0 for arr in sequences], index=df.index)
+        block[f"{column}__variance"] = pd.Series([float(arr.var()) if len(arr) else 0.0 for arr in sequences], index=df.index)
+        block[f"{column}__skewness"] = pd.Series([_safe_skew(arr) for arr in sequences], index=df.index)
+        block[f"{column}__kurtosis"] = pd.Series([_safe_kurtosis(arr) for arr in sequences], index=df.index)
+        block[f"{column}__absolute_maximum"] = pd.Series([float(np.abs(arr).max()) if len(arr) else 0.0 for arr in sequences], index=df.index)
+        block[f"{column}__root_mean_square"] = pd.Series([float(np.sqrt(np.mean(np.square(arr)))) if len(arr) else 0.0 for arr in sequences], index=df.index)
+        block[f"{column}__quantile_25"] = pd.Series([float(np.quantile(arr, 0.25)) if len(arr) else 0.0 for arr in sequences], index=df.index)
+        block[f"{column}__quantile_50"] = pd.Series([float(np.quantile(arr, 0.50)) if len(arr) else 0.0 for arr in sequences], index=df.index)
+        block[f"{column}__quantile_75"] = pd.Series([float(np.quantile(arr, 0.75)) if len(arr) else 0.0 for arr in sequences], index=df.index)
+        block[f"{column}__mean_n_absolute_max"] = pd.Series([_safe_mean_n_absolute_max(arr) for arr in sequences], index=df.index)
+    return _concat_feature_block(df, block)
+
+
+def _add_lag_features(df: pd.DataFrame, columns: Sequence[str]) -> Tuple[pd.DataFrame, List[str]]:
+    block: Dict[str, pd.Series] = {}
+    for column in columns:
+        sequences = _safe_sequence(df[column])
+        block[f"{column}__lag_1"] = pd.Series([float(arr[-1]) if len(arr) >= 1 else 0.0 for arr in sequences], index=df.index)
+        block[f"{column}__lag_6"] = pd.Series([float(arr[-6]) if len(arr) >= 6 else 0.0 for arr in sequences], index=df.index)
+    return _concat_feature_block(df, block)
+
+
+def _add_rolling_features(df: pd.DataFrame, columns: Sequence[str]) -> Tuple[pd.DataFrame, List[str]]:
+    block: Dict[str, pd.Series] = {}
+    for column in columns:
+        sequences = _safe_sequence(df[column])
+        block[f"{column}__rolling_mean_6"] = pd.Series([float(arr[-min(6, len(arr)) :].mean()) if len(arr) else 0.0 for arr in sequences], index=df.index)
+        block[f"{column}__rolling_mean_full"] = pd.Series([float(arr.mean()) if len(arr) else 0.0 for arr in sequences], index=df.index)
+        block[f"{column}__rolling_std_full"] = pd.Series([float(arr.std()) if len(arr) else 0.0 for arr in sequences], index=df.index)
+        block[f"{column}__rolling_min_full"] = pd.Series([float(arr.min()) if len(arr) else 0.0 for arr in sequences], index=df.index)
+        block[f"{column}__rolling_max_full"] = pd.Series([float(arr.max()) if len(arr) else 0.0 for arr in sequences], index=df.index)
+    return _concat_feature_block(df, block)
+
+
+def _add_difference_features(df: pd.DataFrame, columns: Sequence[str]) -> Tuple[pd.DataFrame, List[str]]:
+    block: Dict[str, pd.Series] = {}
+    for column in columns:
+        sequences = _safe_sequence(df[column])
+        block[f"{column}__diff_1"] = pd.Series([float(arr[-1] - arr[-2]) if len(arr) >= 2 else 0.0 for arr in sequences], index=df.index)
+    return _concat_feature_block(df, block)
+
+
+def _add_ewm_features(df: pd.DataFrame, columns: Sequence[str]) -> Tuple[pd.DataFrame, List[str]]:
+    block: Dict[str, pd.Series] = {}
+    for column in columns:
+        sequences = _safe_sequence(df[column])
+        ewm_mean: List[float] = []
+        ewm_std: List[float] = []
+        for arr in sequences:
+            if not len(arr):
+                ewm_mean.append(0.0)
+                ewm_std.append(0.0)
+                continue
+            series = pd.Series(arr, dtype=float)
+            ewm = series.ewm(span=min(12, max(2, len(arr))), adjust=False).mean()
+            ewm_mean.append(float(ewm.iloc[-1]))
+            ewm_std.append(float(series.ewm(span=min(24, max(2, len(arr))), adjust=False).std().fillna(0.0).iloc[-1]))
+        block[f"{column}__ewm_mean"] = pd.Series(ewm_mean, index=df.index)
+        block[f"{column}__ewm_std"] = pd.Series(ewm_std, index=df.index)
+    return _concat_feature_block(df, block)
+
+
+def _add_peak_features(df: pd.DataFrame, columns: Sequence[str]) -> Tuple[pd.DataFrame, List[str]]:
+    block: Dict[str, pd.Series] = {}
+    for column in columns:
+        sequences = _safe_sequence(df[column])
+        block[f"{column}__abs_energy"] = pd.Series([float(np.square(arr).sum()) if len(arr) else 0.0 for arr in sequences], index=df.index)
+        block[f"{column}__value_range"] = pd.Series([float(arr.max() - arr.min()) if len(arr) else 0.0 for arr in sequences], index=df.index)
+        block[f"{column}__absolute_sum_of_changes"] = pd.Series([_safe_absolute_sum_of_changes(arr) for arr in sequences], index=df.index)
+        block[f"{column}__mean_change"] = pd.Series([_safe_mean_change(arr) for arr in sequences], index=df.index)
+        block[f"{column}__mean_abs_change"] = pd.Series([_safe_mean_abs_change(arr) for arr in sequences], index=df.index)
+        block[f"{column}__mean_second_derivative_central"] = pd.Series([_safe_mean_second_derivative_central(arr) for arr in sequences], index=df.index)
+        block[f"{column}__slope"] = pd.Series([_safe_slope(arr) for arr in sequences], index=df.index)
+        block[f"{column}__turning_points"] = pd.Series(
+            [float(np.sum(np.diff(np.sign(np.diff(arr))) != 0)) if len(arr) > 2 else 0.0 for arr in sequences],
+            index=df.index,
+        )
+    return _concat_feature_block(df, block)
+
+
+def _add_calendar_features(df: pd.DataFrame, _: Sequence[str]) -> Tuple[pd.DataFrame, List[str]]:
+    if "timestamp_win" not in df.columns:
+        return df, []
+    dt = pd.to_datetime(df["timestamp_win"], errors="coerce")
+    block = {
         "hour": dt.dt.hour.fillna(0).astype(int),
         "dayofweek": dt.dt.dayofweek.fillna(0).astype(int),
         "day": dt.dt.day.fillna(0).astype(int),
         "month": dt.dt.month.fillna(0).astype(int),
         "is_weekend": dt.dt.dayofweek.isin([5, 6]).fillna(False).astype(int),
     }
-    return _concat_feature_block(engineered, feature_block)
+    return _concat_feature_block(df, block)
 
 
 FEATURE_METHOD_POOL: Dict[str, FeatureMethod] = {
     "lag_signature": _add_lag_features,
+    "distribution_signature": _add_distribution_features,
     "rolling_signature": _add_rolling_features,
     "difference_signature": _add_difference_features,
     "ewm_signature": _add_ewm_features,
@@ -141,133 +213,91 @@ FEATURE_METHOD_POOL: Dict[str, FeatureMethod] = {
 }
 
 
-def _feature_rng(state: DGGlobalState, iteration_index: int) -> random.Random:
-    use_system_random = bool(state.read("use_system_random"))
-    if use_system_random:
-        return random.SystemRandom()
+def _pick_methods(state: DGGlobalState, ds_df: pd.DataFrame, target_col: str) -> List[str]:
+    analysis_result = state.read("data_analysis_result", {}) or {}
+    quality_checks = analysis_result.get("quality_checks", {}) or {}
+    base_analysis = analysis_result.get("base_analysis", {}) or {}
+    stationarity = base_analysis.get("stationarity", {}) or {}
+    seasonality = base_analysis.get("seasonality", {}) or {}
+    target_quality = quality_checks.get("target_sequence_summary", {}) or {}
 
-    task_id = str(state.read("task_id", "default_task"))
-    history = state.read("iteration_history", []) or []
-    history_basis = "|".join(
-        ",".join(item.get("feature_methods", []) or []) for item in history[-2:]
-    )
-    seed_material = f"{task_id}:{iteration_index}:{history_basis}:{len(history)}:feature_engineering"
-    digest = hashlib.sha256(seed_material.encode("utf-8")).hexdigest()
-    return random.Random(int(digest[:16], 16))
-
-
-def _pick_methods(state: DGGlobalState, iteration_index: int, has_date_column: bool) -> List[str]:
-    candidates = [name for name in FEATURE_METHOD_POOL if has_date_column or name != "calendar_signature"]
-    history = state.read("iteration_history", []) or []
-    recently_used = [item.get("feature_methods", []) or [] for item in history[-2:]]
-    previous_signature = tuple(recently_used[-1]) if recently_used else ()
-    rng = _feature_rng(state, iteration_index)
-    sample_size = min(len(candidates), max(2, rng.randint(2, min(3, len(candidates)))))
-
-    novelty_pool = [
-        name
-        for name in candidates
-        if not recently_used or any(name not in used for used in recently_used)
-    ] or candidates
-    selected = rng.sample(novelty_pool, k=min(sample_size, len(novelty_pool)))
-    if len(selected) < sample_size:
-        remainder = [name for name in candidates if name not in selected]
-        selected.extend(rng.sample(remainder, k=min(sample_size - len(selected), len(remainder))))
-    if "lag_signature" not in selected:
-        if len(selected) >= min(len(candidates), 5):
-            selected[-1] = "lag_signature"
-        else:
-            selected.insert(0, "lag_signature")
-
-    if tuple(selected) == previous_signature and len(candidates) > 1:
-        remainder = [name for name in candidates if name not in selected]
-        if remainder:
-            swap_index = rng.randrange(len(selected))
-            selected[swap_index] = rng.choice(remainder)
-            if "lag_signature" not in selected:
-                selected[0] = "lag_signature"
-    return selected[: min(len(candidates), 3)]
+    selected = ["lag_signature", "distribution_signature", "rolling_signature", "difference_signature"]
+    if not stationarity.get("is_stationary"):
+        selected.append("ewm_signature")
+    if seasonality.get("dominant_period") not in (None, "", 0) and "timestamp_win" in ds_df.columns:
+        selected.append("calendar_signature")
+    if int(target_quality.get("max_length", 0)) >= 24 or float(base_analysis.get("statistics", {}).get("std", 0.0) or 0.0) > 0:
+        selected.append("peak_signature")
+    return [name for idx, name in enumerate(selected) if name in FEATURE_METHOD_POOL and name not in selected[:idx]]
 
 
-def _load_station_frames(state: DGGlobalState) -> Dict[str, pd.DataFrame]:
-    profile = state.read("dataset_profile", {})
-    station_paths = profile.get("formatted_dataset_paths") or {}
-    if station_paths:
-        return {
-            str(station_id): pd.read_parquet(Path(str(formatted_path)))
-            for station_id, formatted_path in station_paths.items()
-        }
-
-    formatted_path = profile.get("formatted_dataset_path")
-    if not formatted_path:
-        raise RuntimeError("Missing formatted dataset path. Run data_formatter first.")
-    return {"default": pd.read_parquet(Path(str(formatted_path)))}
+def _pick_source_columns(profile: Dict[str, object], analysis_result: Dict[str, object], target_col: str) -> List[str]:
+    sequence_columns = list(dict.fromkeys(profile.get("feature_columns", []) or []))
+    if sequence_columns:
+        return sequence_columns
+    quality_checks = analysis_result.get("quality_checks", {}) or {}
+    sequence_summary = quality_checks.get("sequence_summary", {}) or {}
+    inferred = [
+        str(item.get("column"))
+        for item in sequence_summary.get("sequence_columns", [])
+        if str(item.get("column") or "") != target_col and int(item.get("max_length", 0)) > 0
+    ]
+    return inferred or [target_col]
 
 
 def run(state: DGGlobalState) -> Dict:
-    dataset_profile = state.read("dataset_profile", {})
-    target_col = dataset_profile.get("target_column")
+    profile = state.read("dataset_profile", {})
+    ds_df = load_ds_dataframe(state, columns=["timestamp_win", profile.get("target_column")] if profile.get("target_column") else None)
+    target_col = profile.get("target_column")
     if not target_col:
-        raise RuntimeError("Missing target column in dataset profile. Run data_formatter first.")
+        raise RuntimeError("Missing target column in dataset profile. Run data_reading first.")
 
     iteration_index = int(state.read("current_iteration_index", 1))
-    date_col = dataset_profile.get("date_column")
-    source_columns = list(dict.fromkeys((dataset_profile.get("feature_columns", []) or []) + [target_col]))
-    selected_methods = _pick_methods(state, iteration_index, bool(date_col))
-    station_frames = _load_station_frames(state)
-    engineered_paths: Dict[str, str] = {}
+    analysis_result = state.read("data_analysis_result", {}) or {}
+    source_columns = _pick_source_columns(profile, analysis_result, target_col)
+    selected_methods = _pick_methods(state, ds_df, target_col)
+    base_columns = ["station", "timestamp_win", "__row_id__", target_col] + source_columns
+    station_frames = load_ds_station_frames(state, columns=list(dict.fromkeys(base_columns)))
     engineered_columns: List[str] = []
+    engineered_dataset_paths: Dict[str, str] = {}
     total_rows = 0
-    total_cols = 0
-    for station_id, frame in station_frames.items():
-        engineered = frame.copy()
-        engineered.attrs["date_column"] = date_col
+    total_columns = 0
+    for station_id, station_df in station_frames.items():
+        engineered = station_df.copy()
         station_created: List[str] = []
         for method_name in selected_methods:
             engineered, created = FEATURE_METHOD_POOL[method_name](engineered, source_columns)
             station_created.extend(created)
-
         for column in station_created:
             engineered[column] = pd.to_numeric(engineered[column], errors="coerce").astype("float32")
-        engineered = engineered.ffill().bfill().fillna(0.0).copy()
-        engineered_path = write_step_dataframe_artifact(
+        engineered = engineered.ffill().bfill().copy()
+        station_path = write_step_dataframe_artifact(
             state,
             "feature_engineering",
             engineered,
             filename=f"engineered_dataset_{station_id}.parquet",
         )
-        engineered_paths[station_id] = str(engineered_path)
+        engineered_dataset_paths[str(station_id)] = str(station_path)
         engineered_columns.extend(station_created)
         total_rows += int(engineered.shape[0])
-        total_cols = max(total_cols, int(engineered.shape[1]))
-
+        total_columns = max(total_columns, int(engineered.shape[1]))
     engineered_columns = list(dict.fromkeys(engineered_columns))
-
-    feature_payload = {
+    payload = {
         "selected_methods": selected_methods,
         "engineered_columns": engineered_columns,
         "source_columns": source_columns,
         "engineered_feature_count": len(engineered_columns),
-        "shape": [total_rows, total_cols],
-        "station_count": len(engineered_paths),
+        "shape": [int(total_rows), int(total_columns)],
         "iteration_index": iteration_index,
-        "random_mode": "system_random" if bool(state.read("use_system_random")) else "deterministic_seeded",
-        "strategy_seed_basis": (
-            f"system_random:{iteration_index}:{int(time.time() * 1000)}"
-            if bool(state.read("use_system_random"))
-            else f"deterministic:{state.read('task_id', 'default_task')}:{iteration_index}:{len(state.read('iteration_history', []) or [])}"
-        ),
-        "tsfresh_inspired_notes": {
-            "lag_signature": "多阶滞后特征",
-            "rolling_signature": "滚动统计量特征",
-            "difference_signature": "差分与变化率特征",
-            "ewm_signature": "指数加权统计特征",
-            "peak_signature": "局部峰值/能量/转折点特征",
-            "calendar_signature": "时间日历特征",
-        },
+        "engineered_dataset_path": next(iter(engineered_dataset_paths.values())) if engineered_dataset_paths else "",
+        "engineered_dataset_paths": engineered_dataset_paths,
+        "selection_basis": "analysis_driven_deterministic",
+        "dataset_kind": "ds",
     }
-    feature_payload["engineered_dataset_paths"] = engineered_paths
-    feature_payload["engineered_dataset_path"] = next(iter(engineered_paths.values()))
-    state.write("feature_engineering_result", feature_payload)
-    write_step_artifact(state, "feature_engineering", feature_payload)
-    return {"message": "feature engineering completed", **feature_payload}
+    state.write("feature_engineering_result", payload)
+    write_step_artifact(state, "feature_engineering", payload)
+    return {
+        "message": "feature engineering completed",
+        "selected_methods": selected_methods,
+        "engineered_feature_count": len(engineered_columns),
+    }

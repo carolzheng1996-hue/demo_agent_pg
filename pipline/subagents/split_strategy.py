@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Dict, List, Tuple
 
 import pandas as pd
@@ -15,6 +14,7 @@ try:
     )
     from ..state import DGGlobalState
     from ..tools import write_step_artifact, write_task_dataframe_artifact
+    from .ds_pipeline_utils import load_ds_station_frames
 except ImportError:
     from data_loading_pg.data_split import (
         split_by_fixed_date,
@@ -25,6 +25,7 @@ except ImportError:
     )
     from state import DGGlobalState
     from tools import write_step_artifact, write_task_dataframe_artifact
+    from subagents.ds_pipeline_utils import load_ds_station_frames
 
 
 def _window_config(state: DGGlobalState) -> Dict:
@@ -54,23 +55,9 @@ def _normalized_ratios(profile: Dict, state: DGGlobalState) -> Dict[str, float]:
     return {key: value / total for key, value in normalized.items()}
 
 
-def _load_formatted_dataframe(state: DGGlobalState) -> pd.DataFrame:
-    profile = state.read("dataset_profile", {})
-    station_paths = profile.get("formatted_dataset_paths") or {}
-    frames: List[pd.DataFrame] = []
-    if station_paths:
-        for station_id, formatted_path in station_paths.items():
-            dataframe = pd.read_parquet(Path(str(formatted_path)))
-            if "timestamp_win" in dataframe.columns:
-                dataframe["timestamp_win"] = pd.to_datetime(dataframe["timestamp_win"], errors="coerce")
-            dataframe["station"] = str(station_id)
-            frames.append(dataframe)
-        return pd.concat(frames, axis=0, ignore_index=True)
-
-    formatted_path = profile.get("formatted_dataset_path")
-    if not formatted_path:
-        raise RuntimeError("split_strategy requires formatted_dataset_path.")
-    dataframe = pd.read_parquet(Path(str(formatted_path)))
+def _load_ds_split_dataframe(state: DGGlobalState) -> pd.DataFrame:
+    station_frames = load_ds_station_frames(state, columns=["__row_id__", "station", "timestamp_win"])
+    dataframe = pd.concat(station_frames.values(), axis=0, ignore_index=True) if station_frames else pd.DataFrame()
     if "timestamp_win" in dataframe.columns:
         dataframe["timestamp_win"] = pd.to_datetime(dataframe["timestamp_win"], errors="coerce")
     return dataframe
@@ -86,7 +73,7 @@ def _apply_split(
     requires_station_column = method in {"station_last_k", "station_month_last_k", "leave_stations_out"}
     if requires_station_column and "station" not in df.columns:
         raise ValueError(
-            f"split_method={method} requires a station column, but the formatted dataset has already been merged by station."
+            f"split_method={method} requires a station column, but the current DS dataset does not contain one."
         )
 
     if method == "station_last_k":
@@ -108,10 +95,10 @@ def _apply_split(
 
 def run(state: DGGlobalState) -> Dict:
     profile = state.read("dataset_profile", {})
-    dataframe = _load_formatted_dataframe(state)
+    dataframe = _load_ds_split_dataframe(state)
     rows = int(len(dataframe))
     if rows <= 0:
-        raise ValueError("split_strategy requires a non-empty formatted dataset.")
+        raise ValueError("split_strategy requires a non-empty DS dataset.")
 
     ratios = _normalized_ratios(profile, state)
     split_method = str(state.read("split_method") or "").strip()
@@ -131,8 +118,8 @@ def run(state: DGGlobalState) -> Dict:
     if train_df.empty or val_df.empty:
         raise ValueError("Split strategy produced an empty training or validation dataset.")
 
-    train_path = write_task_dataframe_artifact(state, "data/split/train_dataset.parquet", train_df)
-    val_path = write_task_dataframe_artifact(state, "data/split/val_dataset.parquet", val_df)
+    train_index_path = write_task_dataframe_artifact(state, "data/split/train_row_ids.parquet", train_df[["__row_id__"]].reset_index(drop=True))
+    val_index_path = write_task_dataframe_artifact(state, "data/split/val_row_ids.parquet", val_df[["__row_id__"]].reset_index(drop=True))
 
     payload = {
         "strategy": split_method,
@@ -145,15 +132,12 @@ def run(state: DGGlobalState) -> Dict:
             "train": int(len(train_df)),
             "val": int(len(val_df)),
         },
-        "dataset_paths": {
-            "train": str(train_path),
-            "val": str(val_path),
+        "row_index_paths": {
+            "train": str(train_index_path),
+            "val": str(val_index_path),
         },
-        "row_ids": {
-            "train": train_df["__row_id__"].astype(int).tolist() if "__row_id__" in train_df.columns else [],
-            "val": val_df["__row_id__"].astype(int).tolist() if "__row_id__" in val_df.columns else [],
-        },
-        "pipeline_source": "data_loading_pg.data_split",
+        "dataset_paths": {},
+        "pipeline_source": "data_loading_pg.data_split_metadata_only",
     }
     state.write("split_strategy_result", payload)
     write_step_artifact(state, "split_strategy", payload)

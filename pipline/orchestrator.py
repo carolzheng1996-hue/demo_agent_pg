@@ -11,6 +11,7 @@ try:
     from .config import MAX_ITERATIONS_CAP, PLAN_FILE
     from .state import DGGlobalState
     from .subagents import SUBAGENT_REGISTRY
+    from .subagents.ds_pipeline_utils import build_ds_profile
     from .task_manager import DGTaskManager
     from .teams import TEAM_REGISTRY
     from .tools import ensure_task_context, mean_ensemble, prepare_iteration_artifacts
@@ -19,6 +20,7 @@ except ImportError:
     from config import MAX_ITERATIONS_CAP, PLAN_FILE
     from state import DGGlobalState
     from subagents import SUBAGENT_REGISTRY
+    from subagents.ds_pipeline_utils import build_ds_profile
     from task_manager import DGTaskManager
     from teams import TEAM_REGISTRY
     from tools import ensure_task_context, mean_ensemble, prepare_iteration_artifacts
@@ -28,7 +30,6 @@ class DGOrchestrator:
     TASK_PLAN_FILE = "task_plan.json"
     FORECAST_STAGE_ORDER = [
         "data_reading",
-        "data_formatter",
         "data_analysis",
         "feature_engineering",
         "split_strategy",
@@ -42,7 +43,6 @@ class DGOrchestrator:
     ]
     DATA_PROCESSING_STAGE_ORDER = [
         "data_reading",
-        "data_formatter",
         "data_analysis",
         "feature_engineering",
         "split_strategy",
@@ -52,7 +52,6 @@ class DGOrchestrator:
     ]
     ANALYSIS_STAGE_ORDER = [
         "data_reading",
-        "data_formatter",
         "data_analysis",
         "summary",
     ]
@@ -102,7 +101,7 @@ class DGOrchestrator:
         stage_order: List[str],
         start_stage: str,
         end_stage: str,
-        skip_split: bool,
+        enable_split: bool,
         enable_feature_engineering: bool,
     ) -> List[str]:
         if start_stage not in stage_order or end_stage not in stage_order:
@@ -115,7 +114,7 @@ class DGOrchestrator:
         plan = stage_order[start_index : end_index + 1]
         if not enable_feature_engineering:
             plan = [step for step in plan if step != "feature_engineering"]
-        if skip_split:
+        if not enable_split:
             plan = [step for step in plan if step not in {"split_strategy", "model_integration", "evaluator"}]
         return plan
 
@@ -125,15 +124,15 @@ class DGOrchestrator:
         intent: str,
         start_stage: str,
         end_stage: str,
-        skip_split: bool,
+        enable_split: bool,
         enable_feature_engineering: bool,
     ) -> Tuple[List[str], Dict]:
         stage_order = cls._stage_order_for_intent(intent, start_stage, end_stage)
-        plan = cls._slice_plan(stage_order, start_stage, end_stage, skip_split, enable_feature_engineering)
+        plan = cls._slice_plan(stage_order, start_stage, end_stage, enable_split, enable_feature_engineering)
         requires_modeling = any(step in cls.MODEL_STAGES for step in plan)
         if requires_modeling:
             task_type = "forecast_modeling"
-        elif any(step in plan for step in {"data_reading", "data_formatter", "data_analysis", "feature_engineering", "preprocess"}):
+        elif any(step in plan for step in {"data_reading", "data_analysis", "feature_engineering", "preprocess"}):
             task_type = "data_processing"
         else:
             task_type = "analysis_only"
@@ -145,19 +144,19 @@ class DGOrchestrator:
         return plan, {
             "task_type": task_type,
             "requires_modeling": requires_modeling,
-            "requires_split": ("split_strategy" in plan) and not skip_split,
+            "requires_split": ("split_strategy" in plan) and enable_split,
             "teams": teams,
             "reason": "deterministic_pipeline",
             "plan_source": "rule_based",
             "start_stage": start_stage,
             "end_stage": end_stage,
-            "skip_split": skip_split,
+            "enable_split": enable_split,
             "enable_feature_engineering": enable_feature_engineering,
         }
 
     @staticmethod
     def _pre_steps(plan: List[str], requires_modeling: bool) -> List[str]:
-        static_steps = ["data_reading", "data_formatter", "data_analysis", "split_strategy", "datanorm"]
+        static_steps = ["data_reading", "data_analysis", "split_strategy", "datanorm"]
         if not requires_modeling:
             static_steps.extend(["feature_engineering", "preprocess"])
         return [step for step in plan if step in static_steps]
@@ -188,35 +187,27 @@ class DGOrchestrator:
         raise FileNotFoundError(f"Cannot resolve ds_dataset.parquet from {dataset_path}")
 
     @staticmethod
-    def _resolve_formatted_paths(dataset_path: str) -> Dict[str, str]:
-        candidate = Path(str(dataset_path))
-        if candidate.is_file():
-            station_name = candidate.stem.replace("formatted_dataset_", "") or "default"
-            return {station_name: str(candidate)}
-
-        station_paths: Dict[str, str] = {}
-        search_dirs = [candidate, candidate / "data" / "formatted"]
-        for search_dir in search_dirs:
-            if not search_dir.exists():
-                continue
-            for path in sorted(search_dir.glob("formatted_dataset_*.parquet")):
-                station_name = path.stem.replace("formatted_dataset_", "")
-                station_paths[station_name] = str(path)
-            if station_paths:
-                return station_paths
-        raise FileNotFoundError(f"No formatted_dataset_*.parquet found under {dataset_path}")
-
-    @staticmethod
     def _resolve_preprocess_paths(dataset_path: str) -> Dict[str, str]:
         candidate = Path(str(dataset_path))
         if candidate.is_file():
             raise ValueError("Preprocess bootstrap requires a directory containing train/val parquet files.")
 
-        mapping = {
+        direct_mapping = {
             "train": candidate / "train_preprocessed.parquet",
             "val": candidate / "val_preprocessed.parquet",
         }
-        result = {name: str(path) for name, path in mapping.items() if path.exists()}
+        result = {name: [str(path)] for name, path in direct_mapping.items() if path.exists()}
+        if result.get("train"):
+            return result
+
+        train_parts = sorted(candidate.glob("preprocess_train_preprocessed_*.parquet"))
+        val_parts = sorted(candidate.glob("preprocess_val_preprocessed_*.parquet"))
+        if train_parts:
+            result = {"train": [str(path) for path in train_parts]}
+            if val_parts:
+                result["val"] = [str(path) for path in val_parts]
+            return result
+
         if "train" not in result:
             raise FileNotFoundError(f"train_preprocessed.parquet not found under {dataset_path}")
         return result
@@ -225,8 +216,7 @@ class DGOrchestrator:
     def _resolve_engineered_paths(dataset_path: str) -> Dict[str, str]:
         candidate = Path(str(dataset_path))
         if candidate.is_file():
-            station_name = candidate.stem.replace("engineered_dataset_", "") or "default"
-            return {station_name: str(candidate)}
+            return {"default": str(candidate)}
 
         search_dirs: List[Path] = [candidate]
         iteration_dirs = sorted(
@@ -237,6 +227,9 @@ class DGOrchestrator:
 
         engineered_paths: Dict[str, str] = {}
         for search_dir in search_dirs:
+            direct_path = search_dir / "feature_engineering_engineered_ds_dataset.parquet"
+            if direct_path.exists():
+                return {"default": str(direct_path)}
             for path in sorted(search_dir.glob("feature_engineering_engineered_dataset_*.parquet")):
                 station_name = path.stem.replace("feature_engineering_engineered_dataset_", "")
                 engineered_paths[station_name] = str(path)
@@ -245,95 +238,68 @@ class DGOrchestrator:
         raise FileNotFoundError(f"No engineered_dataset parquet found under {dataset_path}")
 
     @staticmethod
-    def _resolve_split_row_ids(dataset_path: str) -> Dict[str, List[int]]:
+    def _resolve_split_row_index_paths(dataset_path: str) -> Dict[str, str]:
         candidate = Path(str(dataset_path))
         if candidate.is_file():
             return {}
 
         split_dir_candidates = [candidate / "data" / "split", candidate / "split", candidate]
         mapping = {
-            "train": "train_dataset.parquet",
-            "val": "val_dataset.parquet",
+            "train": "train_row_ids.parquet",
+            "val": "val_row_ids.parquet",
         }
         for split_dir in split_dir_candidates:
             if not split_dir.exists():
                 continue
-            row_ids: Dict[str, List[int]] = {}
+            dataset_paths: Dict[str, str] = {}
             for split_name, filename in mapping.items():
                 path = split_dir / filename
                 if not path.exists():
                     continue
-                frame = pd.read_parquet(path)
-                if "__row_id__" in frame.columns:
-                    row_ids[split_name] = frame["__row_id__"].astype(int).tolist()
-            if row_ids:
-                return row_ids
+                dataset_paths[split_name] = str(path)
+            if dataset_paths:
+                return dataset_paths
         return {}
 
     @staticmethod
-    def _infer_target_and_features(df: pd.DataFrame, target_hint: str) -> Tuple[str, List[str], str | None]:
+    def _infer_ds_target_and_features(df: pd.DataFrame, target_hint: str) -> Tuple[str, List[str], str | None]:
         columns = df.columns.tolist()
         target = ""
         if target_hint:
             if target_hint in columns:
                 target = target_hint
-            else:
-                matches = [column for column in columns if column.startswith(f"{target_hint}_future_step_")]
-                if matches:
-                    target = matches[0]
+            elif f"{target_hint}_future" in columns:
+                target = f"{target_hint}_future"
         if not target:
-            future_candidates = [column for column in columns if str(column).endswith("_future_step_0")]
+            future_candidates = [column for column in columns if str(column).endswith("_future")]
             target = future_candidates[0] if future_candidates else columns[-1]
 
+        feature_cols = []
+        for column in columns:
+            if column in {target, "station", "timestamp_win"}:
+                continue
+            sample = df[column].dropna().iloc[0] if column in df and not df[column].dropna().empty else None
+            if isinstance(sample, (list, tuple)) or hasattr(sample, "shape"):
+                feature_cols.append(column)
         date_col = "timestamp_win" if "timestamp_win" in columns else None
-        feature_cols = [
-            column
-            for column in df.select_dtypes(include=["number"]).columns.tolist()
-            if column not in {target, "__row_id__"}
-        ]
         return target, feature_cols, date_col
 
-    def _bootstrap_data_formatter_input(self, dataset_path: str) -> None:
+    def _bootstrap_ds_profile(self, dataset_path: str) -> None:
         ds_path = self._resolve_ds_path(dataset_path)
-        self.state.write(
-            "dataset_loading_result",
-            {
-                "dataset_path": str(Path(dataset_path)),
-                "ds_dataset_path": str(ds_path),
-                "selected_units": self._parse_name_list(self.state.read("formatter_unit", "")) or self._parse_name_list(self.state.read("unit", "")),
-            },
-        )
-
-    def _bootstrap_formatted_profile(self, dataset_path: str) -> None:
-        formatted_paths = self._resolve_formatted_paths(dataset_path)
-        formatter_units = self._parse_name_list(self.state.read("formatter_unit", ""))
-        if formatter_units:
-            formatted_paths = {station: path for station, path in formatted_paths.items() if station in formatter_units}
-            if not formatted_paths:
-                raise ValueError(f"No formatted parquet matched formatter_unit={formatter_units}")
-
-        first_path = next(iter(formatted_paths.values()))
-        first_df = pd.read_parquet(Path(first_path))
-        target, feature_cols, date_col = self._infer_target_and_features(first_df, str(self.state.read("target_col", "")))
-        dataset_profile = {
-            "dataset_path": str(Path(dataset_path)),
-            "formatted_dataset_paths": formatted_paths,
-            "formatted_dataset_path": first_path,
-            "selected_units": list(formatted_paths.keys()),
-            "shape": [sum(len(pd.read_parquet(Path(path))) for path in formatted_paths.values()), int(first_df.shape[1])],
-            "columns": first_df.columns.tolist(),
-            "date_column": date_col,
-            "target_column": target,
-            "target_columns": [target],
-            "feature_columns": feature_cols,
-            "input_feature_columns": feature_cols,
-        }
+        first_df = pd.read_parquet(Path(ds_path))
+        self.state.write("dataset_path", str(Path(dataset_path)))
+        dataset_profile = build_ds_profile(first_df, self.state, ds_dataset_path=str(ds_path))
         self.state.write("dataset_profile", dataset_profile)
+        split_row_index_paths = self._resolve_split_row_index_paths(dataset_path)
+        if split_row_index_paths:
+            self.state.write("split_strategy_result", {"row_index_paths": split_row_index_paths, "dataset_paths": {}})
 
     def _bootstrap_preprocess_profile(self, dataset_path: str) -> None:
         preprocess_paths = self._resolve_preprocess_paths(dataset_path)
-        train_df = pd.read_parquet(Path(preprocess_paths["train"]))
-        target, feature_cols, date_col = self._infer_target_and_features(train_df, str(self.state.read("target_col", "")))
+        train_source = preprocess_paths["train"]
+        train_path = train_source[0] if isinstance(train_source, list) else train_source
+        train_df = pd.read_parquet(Path(train_path))
+        target, feature_cols, date_col = self._infer_ds_target_and_features(train_df, str(self.state.read("target_col", "")))
         self.state.write(
             "dataset_profile",
             {
@@ -353,7 +319,7 @@ class DGOrchestrator:
         engineered_paths = self._resolve_engineered_paths(dataset_path)
         first_path = next(iter(engineered_paths.values()))
         first_df = pd.read_parquet(Path(first_path))
-        target, feature_cols, date_col = self._infer_target_and_features(first_df, str(self.state.read("target_col", "")))
+        target, feature_cols, date_col = self._infer_ds_target_and_features(first_df, str(self.state.read("target_col", "")))
         self.state.write(
             "dataset_profile",
             {
@@ -370,28 +336,25 @@ class DGOrchestrator:
         self.state.write(
             "feature_engineering_result",
             {
-                "engineered_dataset_paths": engineered_paths,
                 "engineered_dataset_path": first_path,
+                "engineered_dataset_paths": {"default": first_path},
             },
         )
-        row_ids = self._resolve_split_row_ids(dataset_path)
-        if row_ids:
-            self.state.write("split_strategy_result", {"row_ids": row_ids})
+        split_row_index_paths = self._resolve_split_row_index_paths(dataset_path)
+        if split_row_index_paths:
+            self.state.write("split_strategy_result", {"row_index_paths": split_row_index_paths, "dataset_paths": {}})
 
     def _bootstrap_from_stage(self, start_stage: str, dataset_path: str) -> None:
         if start_stage == "data_reading":
             return
-        if start_stage == "data_formatter":
-            self._bootstrap_data_formatter_input(dataset_path)
-            return
         if start_stage in {"data_analysis", "feature_engineering", "split_strategy", "datanorm"}:
-            self._bootstrap_formatted_profile(dataset_path)
+            self._bootstrap_ds_profile(dataset_path)
             return
         if start_stage == "preprocess":
             if bool(self.state.read("enable_feature_engineering")):
                 self._bootstrap_engineered_profile(dataset_path)
             else:
-                self._bootstrap_formatted_profile(dataset_path)
+                self._bootstrap_ds_profile(dataset_path)
             return
         if start_stage in {"model_selection", "model_training", "model_integration", "evaluator", "summary"}:
             self._bootstrap_preprocess_profile(dataset_path)
@@ -511,17 +474,12 @@ class DGOrchestrator:
             raise ValueError("start_stage/end_stage is missing in state. Please provide them in config_all.json or runtime args.")
         enable_split_value = self.state.read("enable_split")
         if enable_split_value is None:
-            skip_split_value = self.state.read("skip_split")
-            if skip_split_value is None:
-                raise ValueError("enable_split is missing in state. Please provide it in config_all.json or runtime args.")
-            enable_split = not bool(skip_split_value)
-        else:
-            enable_split = bool(enable_split_value)
-        skip_split = not enable_split
+            raise ValueError("enable_split is missing in state. Please provide it in config_all.json or runtime args.")
+        enable_split = bool(enable_split_value)
         enable_feature_engineering_value = self.state.read("enable_feature_engineering")
         if enable_feature_engineering_value is None:
             raise ValueError("enable_feature_engineering is missing in state. Please provide it in config_all.json or runtime args.")
-        plan, plan_meta = self._canonical_plan(intent, start_stage, end_stage, skip_split, bool(enable_feature_engineering_value))
+        plan, plan_meta = self._canonical_plan(intent, start_stage, end_stage, enable_split, bool(enable_feature_engineering_value))
         self.state.update(
             {
                 "user_query": user_query,

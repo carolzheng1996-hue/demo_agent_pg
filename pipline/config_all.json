@@ -1,11 +1,9 @@
 {
   "dataset_name": "sample_dataset",
   "unit": "",
-  "formatter_unit": "",
   "start_stage": "data_reading",
   "end_stage": "summary",
   "enable_split": true,
-  "skip_split": false,
   "enable_feature_engineering": true,
   "col_ls": "",
   "pred_col_ls": "",

@@ -12,6 +12,7 @@ try:
         write_step_artifact,
         write_task_dataframe_artifact,
     )
+    from .ds_pipeline_utils import build_ds_profile
 except ImportError:
     from state import DGGlobalState
     from tools import (
@@ -19,6 +20,7 @@ except ImportError:
         write_step_artifact,
         write_task_dataframe_artifact,
     )
+    from subagents.ds_pipeline_utils import build_ds_profile
 
 
 def _load_ods_helpers() -> tuple[Any, Any]:
@@ -118,6 +120,7 @@ def run(state: DGGlobalState) -> Dict:
     ds_df = convert_ods_to_ds(ods_dataframe=ods_df, plant_ids=selected_units, config=ods_to_ds_config)
     ds_df["timestamp_win"] = pd.to_datetime(ds_df["timestamp_win"], errors="coerce")
     ds_df = ds_df.sort_values(["station", "timestamp_win"]).reset_index(drop=True)
+    ds_df["__row_id__"] = ds_df.index.astype("int64")
 
     derived_payload: Dict[str, Any] = {}
     if not str(state.read("target_col") or "").strip() and target_columns:
@@ -128,6 +131,21 @@ def run(state: DGGlobalState) -> Dict:
         state.update(derived_payload, persist=False)
 
     ds_path = write_task_dataframe_artifact(state, "data/data_reading_ds_dataset.parquet", ds_df)
+    ds_dataset_paths: Dict[str, str] = {}
+    if "station" in ds_df.columns:
+        for station_id, station_df in ds_df.groupby(ds_df["station"].astype(str), sort=True):
+            station_path = write_task_dataframe_artifact(
+                state,
+                f"data/ds/station_{station_id}.parquet",
+                station_df.reset_index(drop=True),
+            )
+            ds_dataset_paths[str(station_id)] = str(station_path)
+    dataset_profile = build_ds_profile(
+        ds_df,
+        state,
+        ds_dataset_path=str(ds_path),
+    )
+    dataset_profile["ds_dataset_paths"] = ds_dataset_paths
     description = (
         f"已读取 {len(selected_units)} 个站点的原始数据，并完成 ODS -> DS 转换。"
         f" DS 形状为 {ds_df.shape[0]} x {ds_df.shape[1]}。"
@@ -145,12 +163,14 @@ def run(state: DGGlobalState) -> Dict:
         "description": description,
         "ds_shape": [int(ds_df.shape[0]), int(ds_df.shape[1])],
         "columns": [str(column) for column in ds_df.columns.tolist()],
+        "ds_dataset_paths": ds_dataset_paths,
         "ods_to_ds_config": ods_to_ds_config,
         "resolved_target_col": str(state.read("target_col") or ""),
         "resolved_input_feature_cols": str(state.read("input_feature_cols") or ""),
         "target_columns": list(target_columns),
+        "dataset_profile": dataset_profile,
     }
-    state.update({"dataset_loading_result": payload})
+    state.update({"dataset_loading_result": payload, "dataset_profile": dataset_profile})
     write_step_artifact(state, "data_reading", payload)
     return {
         "message": "ods and ds datasets prepared successfully",

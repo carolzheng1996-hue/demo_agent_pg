@@ -1,39 +1,29 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Dict
-
-import pandas as pd
 
 try:
     from ..state import DGGlobalState
     from ..tools import write_step_artifact
+    from .ds_pipeline_utils import load_ds_dataframe, sequence_to_scalar
 except ImportError:
     from state import DGGlobalState
     from tools import write_step_artifact
+    from subagents.ds_pipeline_utils import load_ds_dataframe, sequence_to_scalar
 
 
 def _auto_decision(state: DGGlobalState) -> Dict:
     profile = state.read("dataset_profile", {})
     requires_modeling = bool(state.read("plan_meta", {}).get("requires_modeling", False))
     target_col = profile.get("target_column")
-    station_paths = profile.get("formatted_dataset_paths") or {}
-    formatted_path = profile.get("formatted_dataset_path")
-    if not requires_modeling or (not station_paths and not formatted_path) or not target_col:
+    if not requires_modeling or not target_col:
         return {"should_normalize": False, "recommended_mode": "skip", "reason": "analysis_only"}
 
-    if station_paths:
-        raw_df = pd.concat(
-            [pd.read_parquet(Path(str(path))) for path in station_paths.values()],
-            axis=0,
-            ignore_index=True,
-        )
-    else:
-        raw_df = pd.read_parquet(Path(str(formatted_path)))
+    raw_df = load_ds_dataframe(state)
     if target_col not in raw_df.columns:
         return {"should_normalize": False, "recommended_mode": "skip", "reason": "analysis_only"}
 
-    series = raw_df[target_col]
+    series = raw_df[target_col].apply(sequence_to_scalar)
     dynamic_range = float(series.max() - series.min()) if len(series) else 0.0
     should_normalize = dynamic_range > 1.0
     return {

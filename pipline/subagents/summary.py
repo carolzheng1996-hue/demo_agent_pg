@@ -61,7 +61,6 @@ def run(state: DGGlobalState) -> Dict:
     iteration_index = int(state.read("current_iteration_index", 1))
     dataset_profile = state.read("dataset_profile", {})
     analysis_result = state.read("data_analysis_result", {})
-    data_formatter_result = state.read("data_formatter_result", {})
     feature_engineering_result = state.read("feature_engineering_result", {})
     split_strategy_result = state.read("split_strategy_result", {})
     datanorm_result = state.read("datanorm_result", {})
@@ -80,9 +79,6 @@ def run(state: DGGlobalState) -> Dict:
         "",
         "## Data Analysis",
         _to_json(analysis_result),
-        "",
-        "## Data Formatter",
-        _to_json(data_formatter_result),
         "",
         "## Feature Engineering",
         _to_json(feature_engineering_result),

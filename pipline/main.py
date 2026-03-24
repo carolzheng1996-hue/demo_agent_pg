@@ -33,16 +33,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dataset-name", default=defaults["dataset_name"], help="数据集名称")
     parser.add_argument("--unit", default=defaults["unit"], help="站点 ID，多个站点用逗号分隔；为空时默认读取目录下全部站点")
     parser.add_argument(
-        "--formatter-unit",
-        default=defaults["formatter_unit"],
-        help="data_formatter 阶段要处理的站点 ID，多个站点用逗号分隔；为空时默认使用前序阶段全部站点",
-    )
-    parser.add_argument(
         "--start-stage",
         default=defaults["start_stage"],
         choices=[
             "data_reading",
-            "data_formatter",
             "data_analysis",
             "feature_engineering",
             "split_strategy",
@@ -61,7 +55,6 @@ def parse_args() -> argparse.Namespace:
         default=defaults["end_stage"],
         choices=[
             "data_reading",
-            "data_formatter",
             "data_analysis",
             "feature_engineering",
             "split_strategy",
@@ -78,7 +71,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--enable-split", dest="enable_split", action="store_true", default=bool(defaults["enable_split"]), help="启用训练/验证切分")
     parser.add_argument("--disable-split", dest="enable_split", action="store_false", help="关闭训练/验证切分")
     parser.add_argument("--enable-feature-engineering", dest="enable_feature_engineering", action="store_true", default=bool(defaults["enable_feature_engineering"]), help="启用特征工程")
-    parser.add_argument("--disable-feature-engineering", dest="enable_feature_engineering", action="store_false", help="关闭特征工程，预处理将直接使用 formatted 数据")
+    parser.add_argument("--disable-feature-engineering", dest="enable_feature_engineering", action="store_false", help="关闭特征工程，预处理将直接使用 DS 数据")
     parser.add_argument("--col-ls", default=defaults["col_ls"], help="显式指定 convert_ods_to_ds 的 col_ls，多个列用逗号分隔")
     parser.add_argument("--pred-col-ls", default=defaults["pred_col_ls"], help="显式指定 convert_ods_to_ds 的 pred_col_ls，多个列用逗号分隔")
     parser.add_argument("--targ-col-ls", default=defaults["targ_col_ls"], help="显式指定 convert_ods_to_ds 的 targ_col_ls，多个列用逗号分隔")
@@ -96,7 +89,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--val-ratio", type=float, default=defaults["val_ratio"], help="验证集比例")
     parser.add_argument("--input-length", type=int, default=defaults["input_length"], help="输入窗口长度")
     parser.add_argument("--output-length", type=int, default=defaults["output_length"], help="输出窗口长度")
-    parser.add_argument("--points-per-day", type=int, default=defaults["points_per_day"], help="每天的采样点数，用于 DS 序列缺失填补")
+    parser.add_argument("--points-per-day", type=int, default=defaults["points_per_day"], help="每天的采样点数；当前版本保留该参数但 data_reading 不再使用它做序列填补")
     parser.add_argument("--enable-normalization", dest="enable_normalization", action="store_true", default=bool(defaults["enable_normalization"]), help="启用标准化")
     parser.add_argument("--disable-normalization", dest="enable_normalization", action="store_false", help="关闭标准化，仅做预处理清洗")
     parser.add_argument(
@@ -120,11 +113,9 @@ def main() -> None:
         {
             "dataset_name": args.dataset_name,
             "unit": args.unit,
-            "formatter_unit": args.formatter_unit,
             "start_stage": args.start_stage,
             "end_stage": args.end_stage,
             "enable_split": args.enable_split,
-            "skip_split": not args.enable_split,
             "enable_feature_engineering": args.enable_feature_engineering,
             "col_ls": args.col_ls,
             "pred_col_ls": args.pred_col_ls,

@@ -1,6 +1,19 @@
 # Todo
 
 ## In Progress
+- [x] 扩展 `subagents/feature_engineering.py`，补充序列统计特征、变化率特征和趋势特征
+- [x] 核对 `subagents/data_reading.py` 的 DS 输出结构，明确下游统一消费协议
+- [x] 去掉 `data_formatter` 阶段与 `formatter_unit` 入参，清理编排、注册表、CLI/Web 和文档中的旧引用
+- [x] 重写 `subagents/data_analysis.py`，直接基于 `data_reading` 输出的 DS 做缺失值检查、统计分析、数据维度与序列长度检查
+- [x] 优化 `subagents/feature_engineering.py`，让其消费 `data_analysis`/`dataset_profile` 约定的 DS 数据并生成稳定特征
+- [x] 校正 `preprocess`、`split_strategy`、bootstrap 和 summary 链路，确保全流程只围绕 DS 与 engineered DS 运转
+- [x] 重写 README / `WEB_API_AND_UI_CONTRACT.md`，删除 formatted/data_formatter 旧描述，补齐新的中间启动约束与产物说明
+- [x] 完成静态校验并在 Review 记录本轮真实改动与未执行项
+- [x] 重写 `data_formatter`、`feature_engineering`、`preprocess`，统一直接消费 `data_reading` 输出的 DS 数据
+- [x] 移除 `data_formatter` 对 DS 展平/按站点输出宽表的职责，改为只做 DS 清洗与字段画像
+- [x] 让特征工程和数据分析直接基于 DS 序列列处理，不再依赖 `formatted_dataset_*.parquet`
+- [x] 调整 `preprocess` 与切分衔接，保证 train/val 在 DS 级别切分后仍可直接进入训练
+- [x] 完成静态验证并补充 review，说明 DS 直连后的新输入输出约定
 - [x] 梳理当前数据读取、格式化、切分、训练链路与 state 依赖
 - [x] 将 `data_loading_pg/data_reading_odsdata.py` 的 `convert_ods_to_ds` 接入现有 `data_reading` 流程
 - [x] 新增 `unit` 入参，用于按站点读取单站或多站数据
@@ -99,3 +112,12 @@
 - README 现明确说明 `enable_feature_engineering`、`enable_split`、`enable_normalization` 三个流程开关的作用，并补充“关闭三者的最小命令”和 zsh 多行续行注意事项；前端表单字段名也改成了更直白的中文
 - `data_reading` 现直接要求显式提供 `col_ls`、`pred_col_ls`、`targ_col_ls`，并在列名不存在时立即报错；`target_col` 与 `input_feature_cols` 仅作为下游格式化、分析和训练阶段的兼容字段保留
 - `data_formatter` 现不再维护单独的序列补齐/填补实现，而是直接调用 `data_loading_pg/ds_to_train.py` 中的 `pad_array_head`、`pad_array_tail`、`fill_nan`
+- 本轮已把 `data_formatter`、`data_analysis`、`feature_engineering`、`split_strategy`、`datanorm`、`preprocess` 收敛到 DS 直连协议：`data_formatter` 只清洗并标注 DS，不再展开宽表；`feature_engineering` 在 DS 行上生成序列统计特征；`preprocess` 才把 DS 序列列展开为模型输入表
+- `split_strategy` 现在直接对带 `__row_id__` 的 DS 行做 train/val 切分，并继续复用 `data_loading_pg.data_split`
+- 中间启动 bootstrap 已改为优先解析 `data_reading_ds_dataset.parquet` 和 `feature_engineering_engineered_ds_dataset.parquet`，不再依赖 `formatted_dataset_*.parquet`
+- 本次仅完成静态校验：`git diff --check` 通过，并复查了关键 state 字段与 bootstrap 路径；未运行 Python 脚本或测试，原因仍是仓库约定需由用户触发
+- 本轮已彻底移除 `data_formatter` 阶段：stage order、subagent 注册、team 配置、CLI/Web 阶段选项、`formatter_unit` 入参和 summary 文案都已同步清理
+- `data_reading` 现在直接输出“清洗后 DS”，并在同一步完成序列补齐、NaN 填补和 `dataset_profile` 构建；后续阶段统一消费 `data/data_reading_ds_dataset.parquet`
+- `data_analysis` 现新增 DS 维度检查、序列长度检查和全表缺失值统计，结果写入 `quality_checks`
+- `feature_engineering` 现改为基于 `data_analysis_result` 做确定性方法选择，不再依赖随机策略，也不再需要 formatted 数据
+- README 与 `WEB_API_AND_UI_CONTRACT.md` 已按当前真实链路重写，中间启动输入约束已改为 DS / engineered DS / preprocessed 三类路径

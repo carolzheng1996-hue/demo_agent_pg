@@ -1,7 +1,6 @@
 try:
     from . import (
         data_analysis,
-        data_formatter,
         datanorm,
         data_reading,
         evaluator,
@@ -15,7 +14,6 @@ try:
     )
 except ImportError:
     import data_analysis
-    import data_formatter
     import datanorm
     import data_reading
     import evaluator
@@ -29,7 +27,6 @@ except ImportError:
 
 SUBAGENT_REGISTRY = {
     "data_reading": data_reading.run,
-    "data_formatter": data_formatter.run,
     "datanorm": datanorm.run,
     "data_analysis": data_analysis.run,
     "feature_engineering": feature_engineering.run,

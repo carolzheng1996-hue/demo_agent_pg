@@ -365,7 +365,6 @@ class DGRequestHandler(BaseHTTPRequestHandler):
             "dataset_path": str(payload.get("dataset_path", "")).strip(),
             "dataset_name": str(payload.get("dataset_name", defaults["dataset_name"])).strip() or defaults["dataset_name"],
             "unit": str(payload.get("unit", defaults["unit"])).strip(),
-            "formatter_unit": str(payload.get("formatter_unit", defaults["formatter_unit"])).strip(),
             "start_stage": str(payload.get("start_stage", defaults["start_stage"])).strip() or defaults["start_stage"],
             "end_stage": str(payload.get("end_stage", defaults["end_stage"])).strip() or defaults["end_stage"],
             "enable_split": self._coerce_bool(payload.get("enable_split"), default=bool(defaults["enable_split"])),
@@ -388,7 +387,6 @@ class DGRequestHandler(BaseHTTPRequestHandler):
             "use_system_random": self._coerce_bool(payload.get("use_system_random"), default=bool(defaults["use_system_random"])),
             "max_iterations": int(payload.get("max_iterations") or defaults["max_iterations"]),
         }
-        normalized["skip_split"] = not normalized["enable_split"]
         if not normalized["query"]:
             raise ValueError("query is required")
         if not normalized["dataset_path"]:

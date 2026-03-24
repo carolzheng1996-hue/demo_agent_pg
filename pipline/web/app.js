@@ -16,7 +16,6 @@ const state = {
 
 const STAGE_ORDER = [
   "data_reading",
-  "data_formatter",
   "data_analysis",
   "feature_engineering",
   "split_strategy",
@@ -159,11 +158,10 @@ function syncFormVisibility() {
   const activeStages = stageRange(startStage, endStage);
   const includesSplit = activeStages.includes("split_strategy") && enableSplit;
   const includesFeature = activeStages.includes("feature_engineering") && enableFeatureEngineering;
-  const includesDsCleanup = activeStages.includes("data_reading") || activeStages.includes("data_formatter");
+  const includesDsCleanup = activeStages.includes("data_reading");
   const includesModel = activeStages.some((stage) => MODEL_STAGES.has(stage)) || (intent === "forecast_modeling" && endStage === "summary");
 
   toggleField("enable_feature_engineering", activeStages.includes("feature_engineering") || activeStages.includes("preprocess") || includesModel);
-  toggleField("formatter_unit", startStage === "data_formatter");
   toggleField("train_ratio", includesSplit);
   toggleField("val_ratio", includesSplit);
   toggleField("split_method", includesSplit);
@@ -394,7 +392,7 @@ function renderStatsPanel(detail) {
   statsGrid.className = "stats-report";
   const allSteps = detail.iterations.flatMap((iteration) => iteration.steps || []);
   const statsSteps = allSteps.filter((step) =>
-    ["data_reading", "data_formatter", "data_analysis", "feature_engineering", "split_strategy", "datanorm", "preprocess"].includes(step.step_name),
+    ["data_reading", "data_analysis", "feature_engineering", "split_strategy", "datanorm", "preprocess"].includes(step.step_name),
   );
 
   if (!statsSteps.length) {
@@ -464,7 +462,7 @@ function renderStatsHeroCards(detail, stepMap) {
   const statistics = analysis.statistics || {};
   const stationarity = analysis.stationarity || {};
   const featureEngineering = stepMap.feature_engineering?.result || {};
-  const datasetProfile = detail.dataset_profile || stepMap.data_formatter?.result?.dataset_profile || {};
+  const datasetProfile = detail.dataset_profile || stepMap.data_reading?.result?.dataset_profile || {};
 
   const metrics = [
     { label: "均值", value: statistics.mean, accent: "warm" },
@@ -502,7 +500,6 @@ function renderStatsSummaryCards(stepMap) {
 
   const sections = [
     buildSummarySection("数据概览", summarizeDataReading(stepMap.data_reading?.result || {})),
-    buildSummarySection("数据规范化", summarizeDataFormatter(stepMap.data_formatter?.result || {})),
     buildSummarySection("统计特性", summarizeDataAnalysis(stepMap.data_analysis?.result || {})),
     buildSummarySection("特征工程", summarizeFeatureEngineering(stepMap.feature_engineering?.result || {})),
     buildSummarySection("切分策略", summarizeSplitStrategy(stepMap.split_strategy?.result || {})),
@@ -607,27 +604,10 @@ function summarizeDataAnalysis(result) {
   ].filter((item) => item.value !== undefined);
 }
 
-function summarizeDataFormatter(result) {
-  const profile = result.dataset_profile || {};
-  return [
-    { label: "输入类型", value: profile.is_directory ? "目录" : "单文件" },
-    { label: "发现文件数", value: profile.available_file_count ?? 0 },
-    { label: "目标列", value: formatTargetColumns(profile) || "—" },
-    { label: "用户输入列", value: (profile.input_feature_columns || []).join(", ") || "—" },
-    { label: "时间列", value: profile.date_column || "—" },
-    { label: "时间派生列", value: (profile.derived_time_columns || []).join(", ") || "—" },
-    { label: "特征列", value: (profile.feature_columns || []).join(", ") || "—" },
-    { label: "规范化形状", value: profile.standardized_shape ? JSON.stringify(profile.standardized_shape) : "—" },
-    { label: "按时间排序", value: formatBooleanDisplay(profile.sorted_by_time) },
-    { label: "是否切分", value: formatBooleanDisplay(profile.need_split) },
-    { label: "处理来源", value: result.pipeline_source || "deterministic_formatter" },
-  ];
-}
-
 function summarizeFeatureEngineering(result) {
   return [
     { label: "特征策略", value: (result.selected_methods || []).join(", ") || "—" },
-    { label: "随机模式", value: result.random_mode || "—" },
+    { label: "特征选择依据", value: result.selection_basis || "—" },
     { label: "输入源列", value: (result.source_columns || []).join(", ") || "—" },
     { label: "新增特征列", value: (result.engineered_columns || []).join("\n") || "—" },
     { label: "新增特征数", value: result.engineered_feature_count },
@@ -1112,9 +1092,6 @@ function getStageGroup(stepName) {
     return "modeling";
   }
   if (["data_reading", "feature_engineering", "split_strategy", "datanorm", "preprocess"].includes(name)) {
-    return "processing";
-  }
-  if (["data_formatter"].includes(name)) {
     return "processing";
   }
   return "analysis";
